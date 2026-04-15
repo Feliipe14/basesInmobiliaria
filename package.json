@@ -1,0 +1,15 @@
+{
+  "name": "bases-inmobiliaria",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Inicializacion idempotente de MongoDB para Inmobiliaria_RAG_NoSQL",
+  "main": "scripts/init-db.js",
+  "scripts": {
+    "db:init": "node scripts/init-db.js",
+    "db:seed": "node scripts/seed-data.js",
+    "db:setup": "npm run db:init && npm run db:seed"
+  },
+  "dependencies": {
+    "mongodb": "^6.17.0"
+  }
+}
