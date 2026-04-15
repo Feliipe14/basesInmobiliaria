@@ -1,5 +1,7 @@
 "use strict";
 
+require("dotenv").config();
+
 /**
  * Script idempotente de inicialización para MongoDB.
  *
@@ -27,7 +29,9 @@ const DB_NAME = process.env.DB_NAME || "Inmobiliaria_RAG_NoSQL";
  * Si ya existe, usa collMod para actualizar validador sin fallar.
  */
 async function ensureCollectionWithValidator(db, name, validator) {
-  const exists = await db.listCollections({ name }, { nameOnly: true }).hasNext();
+  const exists = await db
+    .listCollections({ name }, { nameOnly: true })
+    .hasNext();
 
   if (!exists) {
     await db.createCollection(name, { validator });
@@ -43,7 +47,9 @@ async function ensureCollectionWithValidator(db, name, validator) {
  * Crea una colección simple solo si no existe.
  */
 async function ensureCollection(db, name) {
-  const exists = await db.listCollections({ name }, { nameOnly: true }).hasNext();
+  const exists = await db
+    .listCollections({ name }, { nameOnly: true })
+    .hasNext();
   if (!exists) {
     await db.createCollection(name);
     console.log(`[createCollection] ${name} creada.`);
@@ -65,13 +71,14 @@ async function ensureIndex(collection, keys, options = {}) {
     const conflictNames = new Set([
       "IndexOptionsConflict",
       "IndexKeySpecsConflict",
-      "IndexAlreadyExists"
+      "IndexAlreadyExists",
     ]);
 
     if (conflictNames.has(error.codeName)) {
-      const configuredName = options && options.name ? options.name : "(sin nombre)";
+      const configuredName =
+        options && options.name ? options.name : "(sin nombre)";
       console.warn(
-        `[index-skip] ${collection.collectionName} -> ${configuredName}; conflicto benigno: ${error.codeName}`
+        `[index-skip] ${collection.collectionName} -> ${configuredName}; conflicto benigno: ${error.codeName}`,
       );
       return;
     }
@@ -86,12 +93,20 @@ async function ensureIndex(collection, keys, options = {}) {
  */
 async function ensureSimulatedVectorIndex(collection) {
   try {
-    await ensureIndex(collection, { embedding: "cosine" }, { name: "ix_document_chunks_embedding_cosine" });
+    await ensureIndex(
+      collection,
+      { embedding: "cosine" },
+      { name: "ix_document_chunks_embedding_cosine" },
+    );
   } catch (error) {
     console.warn(
-      `[vector-fallback] ${collection.collectionName}; 'cosine' no soportado en createIndex clásico. Se usa índice ascendente.`
+      `[vector-fallback] ${collection.collectionName}; 'cosine' no soportado en createIndex clásico. Se usa índice ascendente.`,
     );
-    await ensureIndex(collection, { embedding: 1 }, { name: "ix_document_chunks_embedding_simulated" });
+    await ensureIndex(
+      collection,
+      { embedding: 1 },
+      { name: "ix_document_chunks_embedding_simulated" },
+    );
   }
 }
 
@@ -101,6 +116,13 @@ async function main() {
   try {
     await client.connect();
     const db = client.db(DB_NAME);
+
+    console.log("Conexión exitosa a MongoDB Atlas");
+
+    // Verificación real
+    const collections = await db.listCollections().toArray();
+    console.log("Colecciones disponibles:");
+    console.log(collections.map((c) => c.name));
 
     console.log(`Inicializando base de datos: ${DB_NAME}`);
 
@@ -115,16 +137,16 @@ async function main() {
         properties: {
           email: {
             bsonType: "string",
-            pattern: "^.+@.+$"
+            pattern: "^.+@.+$",
           },
           roles: {
             bsonType: "array",
             items: {
-              enum: ["propietario", "arrendatario", "agente"]
-            }
-          }
-        }
-      }
+              enum: ["propietario", "arrendatario", "agente"],
+            },
+          },
+        },
+      },
     });
 
     await ensureCollectionWithValidator(db, "properties", {
@@ -139,31 +161,37 @@ async function main() {
             properties: {
               geo: {
                 bsonType: "object",
-                required: ["type", "coordinates"]
-              }
-            }
-          }
-        }
-      }
+                required: ["type", "coordinates"],
+              },
+            },
+          },
+        },
+      },
     });
 
     await ensureCollectionWithValidator(db, "document_chunks", {
       $jsonSchema: {
         bsonType: "object",
-        required: ["doc_id", "chunk_index", "estrategia_chunking", "texto", "embedding"],
+        required: [
+          "doc_id",
+          "chunk_index",
+          "estrategia_chunking",
+          "texto",
+          "embedding",
+        ],
         properties: {
           doc_id: { bsonType: "string" },
           chunk_index: { bsonType: "int" },
           estrategia_chunking: {
-            enum: ["fixed_size", "semantic", "sentence"]
+            enum: ["fixed_size", "semantic", "sentence"],
           },
           texto: { bsonType: "string" },
           embedding: {
             bsonType: "array",
-            items: { bsonType: "double" }
-          }
-        }
-      }
+            items: { bsonType: "double" },
+          },
+        },
+      },
     });
 
     // ==================================================
@@ -181,7 +209,7 @@ async function main() {
       "documents_repository",
       "image_embeddings",
       "rag_queries_logs",
-      "rag_evaluations"
+      "rag_evaluations",
     ];
 
     for (const name of operationalCollections) {
@@ -193,20 +221,24 @@ async function main() {
     // ==================================================
 
     // users: email único
-    await ensureIndex(db.collection("users"), { email: 1 }, { unique: true, name: "ux_users_email" });
+    await ensureIndex(
+      db.collection("users"),
+      { email: 1 },
+      { unique: true, name: "ux_users_email" },
+    );
 
     // properties: índice geoespacial
     await ensureIndex(
       db.collection("properties"),
       { "ubicacion.geo": "2dsphere" },
-      { name: "ix_properties_ubicacion_geo_2dsphere" }
+      { name: "ix_properties_ubicacion_geo_2dsphere" },
     );
 
     // documents_repository: búsqueda de texto completo
     await ensureIndex(
       db.collection("documents_repository"),
       { contenido: "text" },
-      { name: "ix_documents_repository_contenido_text" }
+      { name: "ix_documents_repository_contenido_text" },
     );
 
     // document_chunks: índice vectorial "simulado" del documento original.
@@ -218,23 +250,23 @@ async function main() {
       db.collection("document_chunks"),
       {
         "chunk_metadata.tipo_doc": 1,
-        "chunk_metadata.ciudad": 1
+        "chunk_metadata.ciudad": 1,
       },
-      { name: "ix_document_chunks_tipo_doc_ciudad" }
+      { name: "ix_document_chunks_tipo_doc_ciudad" },
     );
 
     // listings: filtro por tipo y precio
     await ensureIndex(
       db.collection("listings"),
       { tipo: 1, precio: 1 },
-      { name: "ix_listings_tipo_precio" }
+      { name: "ix_listings_tipo_precio" },
     );
 
     // chat_sessions: relación con listing
     await ensureIndex(
       db.collection("chat_sessions"),
       { listing_id: 1 },
-      { name: "ix_chat_sessions_listing_id" }
+      { name: "ix_chat_sessions_listing_id" },
     );
 
     console.log("Inicialización finalizada correctamente.");
