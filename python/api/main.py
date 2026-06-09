@@ -198,6 +198,7 @@ def log_rag_query(db, query: str, chunks: list[ChunkResult], respuesta: str,
 
 # Endpoint GET /: health check simple, confirma que la API esta viva
 # y muestra la version y enlace a documentacion Swagger
+@app.get("/", summary="Health check")
 def root():
     # **proposito**: endpoint de verificaicon de estado. Retorna informacion
     # basica del servicio para confirmar que la API esta funcionando
