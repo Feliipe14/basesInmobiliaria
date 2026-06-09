@@ -1,5 +1,8 @@
 /* ─── Pipeline RAG ──────────────────────────────────────────────────────── */
 
+// Genera los botones de consultas rapidas para RAG a partir del arreglo QUERIES.
+// Cada boton al hacer clic llena el campo de texto con la pregunta.
+// Concepto clave: **consultas rapidas** y **preguntas predefinidas**.
 function buildRagQuickBtns() {
   var c = document.getElementById('rag-quick-btns');
   c.innerHTML = QUERIES.map(function (q) {
@@ -7,18 +10,27 @@ function buildRagQuickBtns() {
   }).join('');
 }
 
+// Llena el campo de consulta RAG con una pregunta y resalta el boton seleccionado.
+// Concepto clave: **seleccion de consulta** y **pregunta predefinida**.
 function fillRagQuery(q, btn) {
   document.getElementById('rag-query').value = q;
   document.querySelectorAll('#rag-quick-btns .btn-query').forEach(function (b) { b.classList.remove('selected'); });
   btn.classList.add('selected');
 }
 
+// Resalta el boton de consulta cuyo texto coincida con la pregunta actual.
+// Se usa cuando se navega desde el dashboard para que el boton quede seleccionado.
+// Concepto clave: **sincronizacion visual** y **resaltado de boton**.
 function highlightRagBtn(q) {
   document.querySelectorAll('#rag-quick-btns .btn-query').forEach(function (b) {
     b.classList.toggle('selected', b.textContent === q);
   });
 }
 
+// Ejecuta el pipeline completo de RAG: recupera chunks relevantes y genera respuesta con el LLM.
+// Muestra una barra de progreso con 3 pasos: consulta, recuperacion y generacion.
+// Presenta la respuesta final junto con los chunks utilizados como contexto.
+// Concepto clave: **pipeline RAG** y **generacion aumentada por recuperacion**.
 async function doRag() {
   var query = document.getElementById('rag-query').value.trim();
   if (!query) { showToast('Ingresa una pregunta','error'); return; }

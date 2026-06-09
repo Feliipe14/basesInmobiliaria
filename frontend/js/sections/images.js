@@ -2,6 +2,9 @@
 
 // ─── Helper: placeholder elegante (fallback cuando la URL falla) ─────────
 
+// Construye un placeholder visual generico para cuando la URL de la imagen falla.
+// Muestra el icono del edificio, el ID de la propiedad y una etiqueta.
+// Concepto clave: **fallback visual** y **placeholder**.
 function buildImgPlaceholder(propertyId, tipo, height) {
   height = height || 'h-40';
   var phClass = imgPlaceholderClass(propertyId);
@@ -19,6 +22,9 @@ function buildImgPlaceholder(propertyId, tipo, height) {
  * Renderiza un contenedor con una <img> real apuntando a picsum.
  * Si la imagen falla al cargar (onerror) se muestra el placeholder CSS clásico.
  */
+// Renderiza un contenedor con un elemento img real que apunta al servidor de imagenes.
+// Si la imagen falla al cargar, automaticamente se reemplaza por el placeholder.
+// Concepto clave: **carga de imagen** y **fallback automatico**.
 function buildImgWithFallback(propertyId, url, tipo, height, extraAttrs) {
   height = height || 'h-40';
   var phClass = imgPlaceholderClass(propertyId);
@@ -36,6 +42,9 @@ function buildImgWithFallback(propertyId, url, tipo, height, extraAttrs) {
 }
 
 /** Versión inline del placeholder (sin el wrapper <div>). */
+// Version inline del placeholder, sin el div contenedor externo.
+// Se usa dentro del onerror de la imagen para reemplazar el contenido.
+// Concepto clave: **placeholder inline** y **fallback interno**.
 function buildImgPlaceholderInner(propertyId, tipo) {
   var phClass = imgPlaceholderClass(propertyId);
   var tipoLabel = escHtml(tipo || 'Imagen');
@@ -48,6 +57,9 @@ function buildImgPlaceholderInner(propertyId, tipo) {
 
 // ─── Helper: buildImgCard con imagen real ────────────────────────────────
 
+// Construye una tarjeta completa de imagen con foto real y boton de busqueda similar.
+// Al hacer clic en el boton, dispara la busqueda de imagenes parecidas.
+// Concepto clave: **tarjeta de imagen** y **accion de busqueda**.
 function buildImgCard(img, onClickAttr) {
   onClickAttr = onClickAttr || '';
   var tipoLabel = escHtml(img.tipo || 'Imagen');
@@ -68,6 +80,9 @@ function buildImgCard(img, onClickAttr) {
 
 // ─── Cargar galería ───────────────────────────────────────────────────────
 
+// Carga la galeria de imagenes desde la API, mostrando skeletons mientras espera.
+// Obtiene 20 imagenes aleatorias y las renderiza como tarjetas clickeables.
+// Concepto clave: **carga de galeria** y **skeleton loader**.
 async function loadImages() {
   var gallery = document.getElementById('img-gallery');
   gallery.innerHTML = createSkeletonLoader(8,'h-44');
@@ -93,6 +108,9 @@ async function loadImages() {
 
 // ─── Búsqueda imagen→imagen ──────────────────────────────────────────────
 
+// Busca imagenes similares a una imagen dada, usando su media_id.
+// Muestra la imagen fuente y los resultados ordenados por score de similitud.
+// Concepto clave: **busqueda imagen a imagen** y **similitud visual**.
 async function searchSimilar(mediaId, sourceUrl) {
   document.getElementById('img-gallery-panel').classList.add('hidden');
   document.getElementById('img-tab-panel-t2i').classList.remove('active');
@@ -150,6 +168,9 @@ async function searchSimilar(mediaId, sourceUrl) {
   }
 }
 
+// Vuelve a mostrar la galeria principal ocultando el panel de resultados similares.
+// Restaura el breadcrumb de navegacion a "Galeria".
+// Concepto clave: **navegacion hacia atras** y **galeria principal**.
 function showGallery() {
   document.getElementById('img-similar-panel').classList.add('hidden');
   document.getElementById('img-gallery-panel').classList.remove('hidden');
@@ -160,6 +181,9 @@ function showGallery() {
 
 // ─── Tabs: Galería ↔ Búsqueda por descripción ─────────────────────────────
 
+// Cambia entre las pestanas de la seccion de imagenes: galeria y busqueda por descripcion.
+// Activa la pestana seleccionada y oculta la otra.
+// Concepto clave: **pestanas** y **cambio de vista**.
 function switchImgTab(tab) {
   document.querySelectorAll('.img-tab').forEach(function (t) { t.classList.remove('active'); });
   document.querySelectorAll('.img-tab-panel').forEach(function (p) { p.classList.remove('active'); });
@@ -178,12 +202,18 @@ var T2I_EXAMPLES = [
   'Habitación principal',
 ];
 
+// Llena el campo de busqueda texto a imagen con un ejemplo predefinido.
+// Resalta visualmente el boton de ejemplo seleccionado.
+// Concepto clave: **ejemplos de busqueda** y **query predefinida**.
 function fillT2iQuery(q, btn) {
   document.getElementById('t2i-query').value = q;
   document.querySelectorAll('#t2i-examples .btn-query').forEach(function (b) { b.classList.remove('selected'); });
   if (btn) btn.classList.add('selected');
 }
 
+// Ejecuta la busqueda de imagenes a partir de una descripcion textual.
+// Envia la consulta a la API y muestra los resultados ordenados por relevancia.
+// Concepto clave: **texto a imagen** y **busqueda multimodal**.
 async function doTextToImage() {
   var query = document.getElementById('t2i-query').value.trim();
   if (!query) { showToast('Describe la propiedad que buscas','error'); return; }

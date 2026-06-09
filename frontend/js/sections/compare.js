@@ -1,5 +1,8 @@
 /* ─── Comparar Estrategias de Chunking ──────────────────────────────────── */
 
+// Genera los botones de consultas rapidas para la seccion de comparacion.
+// Cada boton al hacer clic llena el campo de consulta y se resalta.
+// Concepto clave: **consultas rapidas** y **comparacion de estrategias**.
 function buildCompareQuick() {
   var c = document.getElementById('compare-quick');
   c.innerHTML = QUERIES.map(function (q) {
@@ -7,6 +10,10 @@ function buildCompareQuick() {
   }).join('');
 }
 
+// Ejecuta una comparacion lado a lado de las tres estrategias de chunking para una misma consulta.
+// Muestra columnas con fixed_size, sentence y semantic, sus metricas y chunks recuperados.
+// La estrategia con mejor score promedio se marca como "MEJOR".
+// Concepto clave: **comparacion de estrategias** y **analisis de chunking**.
 async function doCompare() {
   var query = document.getElementById('compare-query').value.trim();
   if (!query) { showToast('Ingresa una consulta','error'); return; }
@@ -75,6 +82,9 @@ async function doCompare() {
   }
 }
 
+// Genera un analisis textual automatico que explica por que la mejor estrategia obtuvo el mayor score.
+// Incluye una descripcion personalizada segun la estrategia ganadora.
+// Concepto clave: **analisis automatico** y **conclusion de comparacion**.
 function generateCompareAnalysis(estrategias, best) {
   var map = {};
   estrategias.forEach(function (s) { map[s.estrategia] = s; });

@@ -1,5 +1,9 @@
 /* ─── Llamadas a la API ─────────────────────────────────────────────────── */
 
+// Verifica si la API de FastAPI esta corriendo en el servidor local.
+// Si responde correctamente, muestra un indicador verde "API Conectada".
+// Si falla, muestra un banner de "API Desconectada" en rojo.
+// Concepto clave: **health check** y **estado del servidor**.
 async function checkApi() {
   try {
     var r = await fetch(API + '/');

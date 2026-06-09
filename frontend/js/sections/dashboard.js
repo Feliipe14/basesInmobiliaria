@@ -1,5 +1,9 @@
 /* ─── Dashboard ─────────────────────────────────────────────────────────── */
 
+// Carga las estadisticas generales del sistema desde la API /stats.
+// Muestra tarjetas con documentos, chunks, propiedades e imagenes.
+// Tambien presenta las estrategias de chunking con su distribucion porcentual.
+// Concepto clave: **dashboard de estadisticas** y **resumen del sistema**.
 async function loadDashboard() {
   try {
     var r = await fetch(API + '/stats');
@@ -57,6 +61,9 @@ async function loadDashboard() {
   }).join('');
 }
 
+// Navega a la seccion RAG y prellena la consulta con una pregunta seleccionada desde el dashboard.
+// Resalta el boton correspondiente en la seccion RAG.
+// Concepto clave: **navegacion cruzada** y **consulta prellenada**.
 function goToRag(query) {
   document.getElementById('rag-query').value = query;
   var navItem = document.querySelector('[data-section="rag"]');

@@ -1,5 +1,9 @@
 /* ─── Búsqueda Semántica ────────────────────────────────────────────────── */
 
+// Ejecuta una busqueda semantica sobre los documentos usando embeddings.
+// Envia la consulta con la estrategia de chunking, tipo de documento y top_k.
+// Muestra los resultados ordenados por score de similitud coseno.
+// Concepto clave: **busqueda semantica** y **similitud de vectores**.
 async function doSearch() {
   var query = document.getElementById('search-query').value.trim();
   if (!query) { showToast('Ingresa una consulta primero','error'); return; }
@@ -37,6 +41,8 @@ async function doSearch() {
   }
 }
 
+// Limpia el formulario de busqueda: vacia campos, restablece valores por defecto y borra resultados.
+// Concepto clave: **reset de formulario** y **limpiar busqueda**.
 function clearSearch() {
   document.getElementById('search-query').value='';
   document.getElementById('search-strategy').value='';

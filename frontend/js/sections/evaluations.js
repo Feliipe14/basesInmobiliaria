@@ -1,5 +1,9 @@
 /* ─── Evaluaciones ──────────────────────────────────────────────────────── */
 
+// Carga la tabla de evaluaciones desde la API (hasta 30 registros).
+// Muestra columnas con metricas como relevancia, precision, faithfulness y answer relevancy.
+// Si no hay evaluaciones, muestra un mensaje indicando que se debe ejecutar el experimento primero.
+// Concepto clave: **evaluaciones RAG** y **metricas de calidad**.
 async function loadEvaluations() {
   var el = document.getElementById('evaluations-table');
   el.innerHTML = createSkeletonLoader(5,'h-10');
@@ -33,6 +37,9 @@ async function loadEvaluations() {
   }
 }
 
+// Copia el codigo de RAGAS (framework de evaluacion) al portapapeles.
+// Muestra un toast de confirmacion y cambia temporalmente el texto del boton.
+// Concepto clave: **copiar codigo** y **evaluacion RAGAS**.
 function copyRagasCode() {
   var code = document.getElementById('ragas-code').textContent;
   navigator.clipboard.writeText(code).then(function () {

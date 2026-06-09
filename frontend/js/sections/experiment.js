@@ -4,6 +4,9 @@ var _expData = null;
 var _expSortDir = 1;
 var _expSortKey = 'score_promedio';
 
+// Ejecuta el experimento completo que prueba las tres estrategias de chunking contra todas las consultas.
+// Obtiene resultados desde la API y los almacena en _expData para ordenamiento y filtros.
+// Concepto clave: **experimento de chunking** y **evaluacion comparativa**.
 async function doExperiment() {
   var topK = document.getElementById('exp-k').value;
   setLoading('btn-experiment',true);
@@ -25,6 +28,9 @@ async function doExperiment() {
   }
 }
 
+// Renderiza los resultados del experimento: tarjetas de resumen, tabla comparativa, analisis y mapa de calor.
+// Destaca la estrategia optima con una insignia dorada.
+// Concepto clave: **visualizacion de resultados** y **rendering de dashboard**.
 function renderExperiment(d) {
   var resumen = d.resumen;
   var strats = ['fixed_size','sentence','semantic'];
@@ -83,6 +89,9 @@ function renderExperiment(d) {
     '</div>';
 }
 
+// Construye la tabla HTML con los resultados detallados del experimento.
+// Soporta filtrado por estrategias activas y marca el ganador de cada consulta.
+// Concepto clave: **tabla comparativa** y **filtro de estrategias**.
 function buildExpTable(rows, activeStrats) {
   var filtered = rows;
   if (activeStrats) filtered = rows.filter(function (r) { return activeStrats.has(r.estrategia); });
@@ -120,6 +129,9 @@ function buildExpTable(rows, activeStrats) {
   return '<table class="data-table" id="exp-table">' + thead + '<tbody>' + tbody + '</tbody></table>';
 }
 
+// Ordena la tabla del experimento por una columna, alternando entre ascendente y descendente.
+// Modifica el arreglo _expData.resultados y re-renderiza la tabla.
+// Concepto clave: **ordenamiento de tabla** y **sort de columnas**.
 function sortExpTable(key) {
   if (!_expData) return;
   if (_expSortKey === key) _expSortDir *= -1;
@@ -132,6 +144,9 @@ function sortExpTable(key) {
   document.getElementById('exp-table-wrap').innerHTML = buildExpTable(_expData.resultados, null);
 }
 
+// Filtra las filas de la tabla segun las estrategias seleccionadas con los checkboxes.
+// Re-renderiza la tabla mostrando solo las estrategias marcadas.
+// Concepto clave: **filtro dinamico** y **checkboxes de estrategia**.
 function filterExpTable(cb) {
   if (!_expData) return;
   var checkboxes = document.querySelectorAll('[data-strat]');
@@ -139,6 +154,9 @@ function filterExpTable(cb) {
   document.getElementById('exp-table-wrap').innerHTML = buildExpTable(_expData.resultados, active);
 }
 
+// Genera un analisis textual comparativo de las tres estrategias de chunking.
+// Explica ventajas y desventajas de cada una y concluye cual es la optima para el dominio inmobiliario.
+// Concepto clave: **analisis comparativo** y **conclusion del experimento**.
 function buildExpAnalysis(resumen, bestStrat) {
   var strats = ['fixed_size','sentence','semantic'];
   var lines = strats.map(function (s) {
@@ -161,6 +179,10 @@ function buildExpAnalysis(resumen, bestStrat) {
       ' La uniformidad del tamaño favorece la consistencia en la recuperación vectorial para este corpus.') + '</div>';
 }
 
+// Construye un mapa de calor que muestra el score por consulta y por estrategia.
+// Usa colores que van de verde oscuro (alto score) a cafe (bajo score).
+// Incluye una escala de referencia al pie de la tabla.
+// Concepto clave: **mapa de calor** y **visualizacion de scores**.
 function buildHeatmap(rows) {
   var queries = [...new Set(rows.map(function (r) { return r.consulta; }))];
   var strats = ['fixed_size','sentence','semantic'];
@@ -195,6 +217,9 @@ function buildHeatmap(rows) {
     '<div class="flex items-center gap-4 mt-2 text-xs text-text-muted"><span>Escala:</span>' + scaleHtml + '</div>';
 }
 
+// Exporta los resultados del experimento a un archivo CSV descargable.
+// Genera un blob con cabecera y filas, crea un enlace temporal y lo descarga.
+// Concepto clave: **exportacion CSV** y **descarga de datos**.
 function exportExpCsv() {
   if (!_expData) return;
   var rows = _expData.resultados;

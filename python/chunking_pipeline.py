@@ -5,8 +5,8 @@ Aplica 3 estrategias de chunking a cada documento en documents_repository
 y guarda los chunks vectorizados en document_chunks.
 
 Estrategias implementadas:
-  1. fixed_size   — RecursiveCharacterTextSplitter (chunk_size≈256 tokens)
-  2. sentence     — Máximo 5 oraciones por chunk, overlap de 1 oración
+  1. fixed_size   — RecursiveCharacterTextSplitter (chunk_size aprox 256 tokens)
+  2. sentence     — Maximo 5 oraciones por chunk, overlap de 1 oracion
   3. semantic     — Umbral de similitud coseno 0.80 entre oraciones adyacentes
 
 Ejecutar:
@@ -33,10 +33,13 @@ from database import get_db, close
 # Modelo de embeddings (singleton)
 # ---------------------------------------------------------------------------
 
+# Variable privada para mantener el modelo de Sentence Transformers en memoria
+# **carga_una_vez**: el modelo se carga al primer uso y se reutiliza
 _model: SentenceTransformer | None = None
 
 
 def get_model() -> SentenceTransformer:
+    # **funcion_principal**: retorna el modelo de embeddings, cargandolo solo si es necesario
     global _model
     if _model is None:
         print(f"  Cargando modelo {settings.text_embedding_model}...")
@@ -45,21 +48,23 @@ def get_model() -> SentenceTransformer:
 
 
 def embed(texts: List[str]) -> List[List[float]]:
+    # **algoritmo**: convierte una lista de textos en vectores numericos normalizados
+    # El modelo all-MiniLM-L6-v2 produce vectores de 384 dimensiones
     model = get_model()
     vecs = model.encode(texts, batch_size=32, show_progress_bar=False, normalize_embeddings=True)
     return vecs.tolist()
 
 
 # ---------------------------------------------------------------------------
-# Tokenización por oraciones (sin dependencia de NLTK)
+# Tokenizacion por oraciones (sin dependencia de NLTK)
 # ---------------------------------------------------------------------------
 
 def split_sentences(text: str) -> List[str]:
-    """Divide texto en oraciones usando regex. Funciona bien para español."""
+    # **responsabilidad**: divide un texto en oraciones usando expresiones regulares
+    # Funciona para espanol detectando puntos, signos de exclamacion e interrogacion
+    # seguidos de mayuscula o tilde
     text = text.strip()
-    # Divide en puntos, signos de exclamación e interrogación seguidos de mayúscula o fin
     parts = re.split(r"(?<=[.!?])\s+(?=[A-ZÁÉÍÓÚÑÜ])", text)
-    # Filtra oraciones muy cortas (ruido)
     return [p.strip() for p in parts if len(p.strip()) > 15]
 
 
@@ -69,10 +74,12 @@ def split_sentences(text: str) -> List[str]:
 
 def chunk_fixed_size(text: str) -> List[str]:
     """
-    Divide el texto en chunks de tamaño fijo.
-    chunk_size=1024 chars ≈ 256 tokens (ratio ~4 chars/token).
-    chunk_overlap=128 chars ≈ 32 tokens.
+    Divide el texto en chunks de tamano fijo.
+    chunk_size=1024 chars aprox 256 tokens (ratio ~4 chars/token).
+    chunk_overlap=128 chars aprox 32 tokens.
     """
+    # **algoritmo**: usa RecursiveCharacterTextSplitter de LangChain para dividir
+    # el texto en fragmentos de tamano constante con superposicion controlada
     splitter = RecursiveCharacterTextSplitter(
         chunk_size=settings.fixed_chunk_size,
         chunk_overlap=settings.fixed_chunk_overlap,
@@ -89,9 +96,11 @@ def chunk_fixed_size(text: str) -> List[str]:
 
 def chunk_sentence(text: str, max_sentences: int = 5, overlap: int = 1) -> List[str]:
     """
-    Agrupa oraciones en chunks de máximo `max_sentences` oraciones.
+    Agrupa oraciones en chunks de maximo `max_sentences` oraciones.
     Se aplica overlap de `overlap` oraciones entre chunks consecutivos.
     """
+    # **algoritmo**: primero divide en oraciones, luego las agrupa respetando
+    # los limites naturales del lenguaje (puntos, signos)
     sentences = split_sentences(text)
     if not sentences:
         return [text] if text.strip() else []
@@ -115,10 +124,12 @@ def chunk_sentence(text: str, max_sentences: int = 5, overlap: int = 1) -> List[
 
 def chunk_semantic(text: str, threshold: float = None) -> List[str]:
     """
-    Divide el texto basándose en la similitud semántica entre oraciones adyacentes.
+    Divide el texto basandose en la similitud semantica entre oraciones adyacentes.
     Cuando la similitud cae por debajo de `threshold`, se inicia un nuevo chunk.
-    Se aplica overlap de 1 oración.
+    Se aplica overlap de 1 oracion.
     """
+    # **algoritmo**: convierte cada oracion a embedding, calcula similitud coseno
+    # entre oraciones vecinas, y corta cuando cambia el tema (similitud baja)
     if threshold is None:
         threshold = settings.semantic_threshold
 
@@ -142,7 +153,7 @@ def chunk_semantic(text: str, threshold: float = None) -> List[str]:
             current.append(sentences[i])
         else:
             chunks.append(" ".join(current).strip())
-            # Overlap: el último elemento de current inicia el siguiente chunk
+            # Overlap: el ultimo elemento de current inicia el siguiente chunk
             current = [sentences[i - 1], sentences[i]]
 
     if current:
@@ -156,6 +167,8 @@ def chunk_semantic(text: str, threshold: float = None) -> List[str]:
 # ---------------------------------------------------------------------------
 
 def save_chunks(db, doc_id: str, chunks: List[str], strategy: str, tipo_doc: str, ciudad: str):
+    # **responsabilidad**: genera embedding para cada chunk y lo guarda en la
+    # coleccion document_chunks de MongoDB usando operacion upsert
     col = db["document_chunks"]
     embeddings = embed(chunks)
     now = datetime.now(timezone.utc).isoformat()
@@ -186,7 +199,8 @@ def save_chunks(db, doc_id: str, chunks: List[str], strategy: str, tipo_doc: str
 
 
 def mark_doc_chunked(db, doc_id: str, strategy: str):
-    """Registra en documents_repository que el doc ya tiene chunks de esta estrategia."""
+    # **responsabilidad**: actualiza el documento original para indicar que ya tiene
+    # chunks generados con esta estrategia, evitando reprocesamiento
     db["documents_repository"].update_one(
         {"_id": doc_id},
         {"$addToSet": {"chunking_aplicado": strategy}},
@@ -207,6 +221,9 @@ CIUDAD_DEFAULT = "Manizales"
 
 
 def run_pipeline(strategy_filter: str = "all"):
+    # **funcion_principal**: recorre todos los documentos de documents_repository,
+    # aplica la(s) estrategia(s) de chunking seleccionada(s) y guarda los chunks
+    # en document_chunks con sus embeddings correspondientes
     db = get_db()
     docs_col = db["documents_repository"]
 
@@ -230,6 +247,7 @@ def run_pipeline(strategy_filter: str = "all"):
             continue
 
         for strategy in selected:
+            # **optimizacion**: salta documentos que ya fueron procesados con esta estrategia
             if strategy in ya_chunked:
                 print(f"    [skip] {doc_id} — {strategy} ya procesado")
                 continue
@@ -242,19 +260,20 @@ def run_pipeline(strategy_filter: str = "all"):
             n = save_chunks(db, doc_id, chunks, strategy, tipo, CIUDAD_DEFAULT)
             mark_doc_chunked(db, doc_id, strategy)
             total_chunks += n
-            print(f"    [OK] {doc_id:<40} {strategy:<12} → {n:>3} chunks")
+            print(f"    [OK] {doc_id:<40} {strategy:<12} — {n:>3} chunks")
 
     print(f"\n  Total chunks generados/actualizados: {total_chunks}")
     return total_chunks
 
 
 # ---------------------------------------------------------------------------
-# Búsqueda vectorial real con Atlas $vectorSearch
+# Busqueda vectorial real con Atlas $vectorSearch
 # ---------------------------------------------------------------------------
 
 
 def build_filter(strategy: str | None, tipo_doc: str | None) -> dict:
-    """Construye el filtro para $vectorSearch a partir de parámetros opcionales."""
+    # **responsabilidad**: construye el filtro para $vectorSearch a partir de
+    # parametros opcionales como estrategia de chunking y tipo de documento
     filtro: dict = {}
     if strategy:
         filtro["estrategia_chunking"] = strategy
@@ -271,13 +290,16 @@ def vector_search(
     top_k: int = 5,
 ) -> List[dict]:
     """
-    Búsqueda vectorial real usando Atlas Vector Search ($vectorSearch).
-    Requiere el índice 'vector_index_chunks' creado en Atlas UI.
+    Busqueda vectorial real usando Atlas Vector Search ($vectorSearch).
+    Requiere el indice 'vector_index_chunks' creado en Atlas UI.
 
-    La función genera el embedding de la consulta y ejecuta una agregación
-    con $vectorSearch, devolviendo los `top_k` chunks más similares junto
+    La funcion genera el embedding de la consulta y ejecuta una agregacion
+    con $vectorSearch, devolviendo los `top_k` chunks mas similares junto
     con su score de similitud vectorial provisto por Atlas.
     """
+    # **algoritmo**: convierte la consulta a vector, ejecuta busqueda por similitud
+    # en MongoDB Atlas usando el indice vector_index_chunks, y retorna los chunks
+    # mas relevantes con su puntuacion de similitud
     query_vec = embed([query])[0]
 
     pipeline: list[dict] = [
@@ -313,15 +335,18 @@ def vector_search_images(
     top_k: int = 5,
 ) -> List[dict]:
     """
-    Búsqueda vectorial por similitud de imágenes usando Atlas Vector Search.
+    Busqueda vectorial por similitud de imagenes usando Atlas Vector Search.
 
-    Requiere el índice 'vector_index_images' creado en Atlas UI sobre la
-    colección image_embeddings.
+    Requiere el indice 'vector_index_images' creado en Atlas UI sobre la
+    coleccion image_embeddings.
 
-    Si se proporciona un media_id, busca imágenes visualmente similares a esa
-    imagen de referencia (usando su embedding). Si no, retorna las imágenes
+    Si se proporciona un media_id, busca imagenes visualmente similares a esa
+    imagen de referencia (usando su embedding). Si no, retorna las imagenes
     con mayor score (top_k globales).
     """
+    # **algoritmo**: si no hay media_id, retorna una muestra aleatoria de imagenes.
+    # Si hay media_id, busca el embedding de esa imagen y ejecuta $vectorSearch
+    # para encontrar las mas similares visualmente
     if not media_id:
         return list(
             db["image_embeddings"].aggregate([
@@ -397,6 +422,8 @@ def vector_search_images(
 # ---------------------------------------------------------------------------
 
 def main():
+    # **punto_entrada**: funcion principal que se ejecuta desde linea de comandos
+    # Recibe el parametro --strategy para seleccionar que estrategia ejecutar
     parser = argparse.ArgumentParser(description="Pipeline de chunking y embeddings RAG Inmobiliaria")
     parser.add_argument(
         "--strategy",
@@ -413,7 +440,7 @@ def main():
     run_pipeline(args.strategy)
 
     close()
-    print("\n  Pipeline finalizado. Próximo paso: python api/main.py")
+    print("\n  Pipeline finalizado. Proximo paso: python api/main.py")
 
 
 if __name__ == "__main__":

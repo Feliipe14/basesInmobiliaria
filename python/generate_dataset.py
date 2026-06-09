@@ -37,6 +37,10 @@ from database import get_db, close
 # Pool de fotos reales de Unsplash para media_assets
 # ---------------------------------------------------------------------------
 
+# **UNSPLASH_POOLS**: conjunto de IDs de fotos reales de Unsplash, organizados por
+# tipo de imagen. Hay 3 categorias: imagen_fachada (exterior del edificio),
+# imagen_sala (sala/comedor) e imagen_habitacion (habitacion). Se usan para asignar
+# fotos realistas a las 20 propiedades del sistema. Total: 15 fachadas, 20 salas, 20 habitaciones.
 UNSPLASH_POOLS = {
     "imagen_fachada": [
         "1713526194722-061e9ab932ee", "1629964642991-4838222984e0",
@@ -75,8 +79,11 @@ UNSPLASH_POOLS = {
 }
 
 
+# **_unsplash_url**: genera una URL de Unsplash de manera **determinista**.
+# Usa el media_id como semilla para un hash MD5, selecciona siempre la misma imagen
+# del pool correspondiente (fachada, sala o habitacion). Esto garantiza que al
+# ejecutar el script varias veces, cada propiedad tenga siempre las mismas fotos.
 def _unsplash_url(media_id: str, tipo: str) -> str:
-    """Genera URL de Unsplash determinista a partir del media_id y tipo."""
     pool = UNSPLASH_POOLS.get(tipo, UNSPLASH_POOLS["imagen_sala"])
     h = hashlib.md5(media_id.encode("utf-8")).hexdigest()
     idx = int(h, 16) % len(pool)
@@ -87,10 +94,17 @@ def _unsplash_url(media_id: str, tipo: str) -> str:
 # Helpers
 # ---------------------------------------------------------------------------
 
+# **now_iso**: funcion helper que devuelve la fecha y hora actual en formato ISO 8601.
+# Esto se usa para timestamps consistentes en toda la base de datos. Siempre usa UTC
+# para evitar problemas con zonas horarias.
 def now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+# **upsert**: operacion de MongoDB que combina "insert" y "update".
+# Si el documento ya existe por su _id, lo actualiza; si no existe, lo crea.
+# Esto hace que el script sea **idempotente**, es decir, se puede ejecutar
+# varias veces sin duplicar datos.
 def upsert(collection, doc: dict):
     collection.update_one({"_id": doc["_id"]}, {"$set": doc}, upsert=True)
 
@@ -99,6 +113,11 @@ def upsert(collection, doc: dict):
 # Datos maestros
 # ---------------------------------------------------------------------------
 
+# **USERS**: lista de 13 usuarios que representan los 3 roles del sistema.
+# - 5 propietarios (dueños de inmuebles)
+# - 5 agentes inmobiliarios (vinculados a 3 agencias)
+# - 3 arrendatarios (inquilinos que buscan o alquilan propiedades)
+# Se incluye la agencia a la que pertenece cada agente mediante "agency_id".
 USERS = [
     {"_id": "u_001", "nombre": "Carlos Ríos",        "email": "carlos.rios@gmail.com",    "roles": ["propietario"]},
     {"_id": "u_002", "nombre": "María Ospina",        "email": "maria.ospina@gmail.com",   "roles": ["propietario"]},
@@ -115,12 +134,18 @@ USERS = [
     {"_id": "u_013", "nombre": "Sebastián Cano",      "email": "sebastian.cano@outlook.com","roles": ["arrendatario"]},
 ]
 
+# **AGENCIES**: las 3 agencias inmobiliarias que operan en Manizales.
+# Cada agencia tiene un listado de los ids de los agentes que trabajan alli.
+# Esto permite filtrar propiedades por agencia o consultar el equipo de ventas.
 AGENCIES = [
     {"_id": "ag_001", "nombre": "Realty Manizales",       "agents_ids": ["u_006", "u_007"]},
     {"_id": "ag_002", "nombre": "Casas y Fincas Caldas",  "agents_ids": ["u_008", "u_009"]},
     {"_id": "ag_003", "nombre": "HomeMatch Colombia",     "agents_ids": ["u_010"]},
 ]
 
+# **NEIGHBORHOODS**: diccionario de los 10 barrios de Manizales incluidos en el sistema.
+# Cada barrio tiene: latitud, longitud (para el campo GeoJSON en MongoDB) y estrato
+# socioeconomico. Esto permite hacer busquedas geograficas y filtrar por estrato.
 # (barrio, lat, lng, estrato_base)
 NEIGHBORHOODS = {
     "El Cable":   (5.0647, -75.5011, 5),
@@ -135,6 +160,10 @@ NEIGHBORHOODS = {
     "La Sultana": (5.0566, -75.5152, 3),
 }
 
+# **PROPERTY_CONFIGS**: configuracion basica de las 20 propiedades del sistema.
+# Cada propiedad tiene: propietario, tipo (apartamento, casa o local), barrio,
+# area en m2, numero de habitaciones, banos, parqueadero y si acepta mascotas.
+# El campo "agent" vincula la propiedad al agente encargado de su gestion.
 PROPERTY_CONFIGS = [
     {"_id": "prop_001", "owner": "u_001", "tipo": "apartamento", "barrio": "El Cable",   "area": 75,  "hab": 2, "ban": 2, "piso": 5,  "admin": 180000, "park": True,  "masc": False, "agent": "u_006"},
     {"_id": "prop_002", "owner": "u_001", "tipo": "apartamento", "barrio": "El Cable",   "area": 90,  "hab": 3, "ban": 2, "piso": 8,  "admin": 210000, "park": True,  "masc": True,  "agent": "u_006"},
@@ -612,6 +641,9 @@ NOTA LEGAL: Las reparaciones eléctricas deben realizarlas técnicos certificado
 # Cargar datos en MongoDB
 # ---------------------------------------------------------------------------
 
+# **load_users**: inserta los 13 usuarios en la coleccion "users" de MongoDB.
+# Usa la funcion upsert para que el script sea idempotente. Cada usuario tiene
+# roles que determinan su comportamiento en el sistema (propietario, agente, arrendatario).
 def load_users(db):
     col = db["users"]
     for u in USERS:
@@ -619,6 +651,8 @@ def load_users(db):
     print(f"  [OK] {len(USERS)} usuarios")
 
 
+# **load_agencies**: inserta las 3 agencias inmobiliarias en la coleccion "agencies".
+# Cada agencia contiene la lista de agentes que trabajan en ella mediante "agents_ids".
 def load_agencies(db):
     col = db["agencies"]
     for a in AGENCIES:
@@ -626,6 +660,10 @@ def load_agencies(db):
     print(f"  [OK] {len(AGENCIES)} agencias")
 
 
+# **load_properties**: inserta las 20 propiedades y sus 60 media_assets asociados.
+# Por cada propiedad genera 3 imagenes de Unsplash (fachada, sala, habitacion)
+# usando la funcion _unsplash_url. Las imagenes se guardan en la coleccion media_assets
+# con un embedding_id que luego se usara en load_image_embeddings.
 def load_properties(db):
     props_col = db["properties"]
     media_col = db["media_assets"]
@@ -667,6 +705,10 @@ def load_properties(db):
     print(f"  [OK] {len(PROPERTY_CONFIGS)} propiedades, {media_count} media_assets")
 
 
+# **load_listings**: genera 20 publicaciones (listings) a partir de las propiedades.
+# Cada listing puede ser de tipo "arriendo" o "venta". Aplica formulas de precio
+# segun tipo de propiedad, area, estrato y numero de habitaciones.
+# Tambien asigna el agente responsable de cada publicacion.
 def load_listings(db):
     col = db["listings"]
     for i, cfg in enumerate(PROPERTY_CONFIGS, 1):
@@ -687,8 +729,15 @@ def load_listings(db):
     print(f"  [OK] {len(PROPERTY_CONFIGS)} listings")
 
 
+# **load_contracts**: inserta 15 contratos de arrendamiento en la coleccion "contracts".
+# Cada contrato incluye: partes involucradas, fechas, estado (activo/finalizado/cancelado)
+# y 4 clausulas legales (mascotas, subarriendo, canon, mantenimiento). Tambien enlaza
+# al documento legal completo que se genera en load_documents.
 def load_contracts(db):
     col = db["contracts"]
+    # **CONTRACTS**: 15 contratos de arrendamiento con estados variados (activo, finalizado, cancelado).
+    # Cada contrato vincula: listing, arrendador (propietario) y arrendatario (inquilino).
+    # Incluye clausulas estandar del sistema legal colombiano (mascotas, subarriendo, canon, mantenimiento).
     contract_data = [
         ("cont_001", "list_prop_001", "u_001", "u_011", "activo",   "2024-03-01", "2025-03-01", 1, "marzo",    2024),
         ("cont_002", "list_prop_003", "u_002", "u_012", "activo",   "2024-06-15", "2025-06-15", 15,"junio",    2024),
@@ -729,6 +778,10 @@ def load_contracts(db):
     return contract_data
 
 
+# **load_reviews**: inserta 15 resenas de propiedades escritas por los arrendatarios.
+# Cada resena tiene: autor, propiedad evaluada, calificacion del 1 al 5 y un comentario
+# en espanol colombiano. Esto permite demostrar busquedas de texto completo y analisis
+# de sentimiento en MongoDB Atlas.
 def load_reviews(db):
     col = db["reviews"]
     reviews = [
@@ -760,6 +813,9 @@ def load_reviews(db):
     print(f"  [OK] {len(reviews)} reseñas")
 
 
+# **load_maintenance**: inserta 10 solicitudes de mantenimiento para distintos contratos.
+# Los estados posibles son "pendiente", "en_progreso" y "resuelto". Esto simula el flujo
+# de trabajo real de una inmobiliaria: el arrendatario reporta un dano y el agente lo gestiona.
 def load_maintenance(db):
     col = db["maintenance_requests"]
     requests = [
@@ -785,6 +841,11 @@ def load_maintenance(db):
     print(f"  [OK] {len(requests)} solicitudes de mantenimiento")
 
 
+# **load_documents**: genera mas de 100 documentos en la coleccion "documents_repository".
+# Estos documentos son la base del sistema RAG: incluyen descripciones de propiedades,
+# contratos completos, reglamentos de copropiedad, transcripciones de chat, reportes de
+# mercado, preguntas frecuentes y guias de mantenimiento. Cada documento tiene un campo
+# "tipo" que permite filtrar por categoria durante las busquedas semanticas.
 def load_documents(db, contract_data):
     col = db["documents_repository"]
     docs = []
@@ -1181,14 +1242,13 @@ Administración mensual: {'$' + f'{cfg["admin"]:,} COP' if cfg['admin'] > 0 else
     return docs
 
 
+# **load_image_embeddings**: esta es la funcion mas importante del proyecto.
+# Usa el modelo **CLIP** (openai/clip-vit-base-patch32) para generar embeddings
+# reales de 512 dimensiones a partir de las imagenes descargadas de Unsplash.
+# Sigue el mismo enfoque del Notebook 03 del profesor: descarga cada imagen,
+# la procesa con el vision_model de CLIP, aplica visual_projection y normaliza
+# el vector resultante. Los embeddings se guardan en la coleccion "image_embeddings".
 def load_image_embeddings(db):
-    """Embeddings de imagen con CLIP real (openai/clip-vit-base-patch32, 512 dims).
-
-    Sigue el enfoque del Notebook 03 del profesor:
-    - Descarga cada imagen desde la URL en media_assets
-    - Genera embedding visual con CLIP (vision_model + visual_projection)
-    - Guarda en image_embeddings con upsert para idempotencia
-    """
     import io
     import requests
     from PIL import Image
@@ -1249,10 +1309,11 @@ def load_image_embeddings(db):
     print(f"  [OK] {count} image_embeddings (CLIP 512-dim)")
 
 
+# **_fallback_embedding**: genera un embedding artificial de 512 dimensiones cuando
+# no se puede descargar la imagen real de Unsplash. Usa un seed basado en el media_id
+# para que el resultado sea **determinista** (misma entrada produce el mismo vector).
+# Esto evita que el script falle si hay problemas de red con Unsplash.
 def _fallback_embedding(media_id: str) -> list:
-    """Embedding determinista de fallback cuando no hay imagen real disponible.
-    Usa un seed basado en el media_id para generar un vector 512-d normalizado.
-    """
     import random, math, hashlib
     seed = int(hashlib.md5(media_id.encode()).hexdigest(), 16) % (2**31 - 1)
     rng = random.Random(seed)
@@ -1265,6 +1326,11 @@ def _fallback_embedding(media_id: str) -> list:
 # Main
 # ---------------------------------------------------------------------------
 
+# **main**: funcion principal que orquesta la carga completa del dataset.
+# El flujo es secuencial: primero usuarios y agencias, luego propiedades con sus
+# imagenes, despues listings, contratos, resenas, mantenimiento, documentos y
+# finalmente los embeddings CLIP. Cada paso depende del anterior.
+# Al finalizar imprime un resumen y sugiere ejecutar chunking_pipeline.py.
 def main():
     print("=== Generando dataset de prueba ===")
     db = get_db()
