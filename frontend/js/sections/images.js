@@ -1,6 +1,6 @@
 /* ─── Imágenes: Galería, Búsqueda imagen→imagen, texto→imagen ──────────── */
 
-// ─── Helper: placeholder elegante ─────────────────────────────────────────
+// ─── Helper: placeholder elegante (fallback cuando la URL falla) ─────────
 
 function buildImgPlaceholder(propertyId, tipo, height) {
   height = height || 'h-40';
@@ -13,16 +13,46 @@ function buildImgPlaceholder(propertyId, tipo, height) {
   '</div>';
 }
 
+// ─── Helper: tarjeta de imagen con <img> real + fallback a placeholder ───
+
+/**
+ * Renderiza un contenedor con una <img> real apuntando a picsum.
+ * Si la imagen falla al cargar (onerror) se muestra el placeholder CSS clásico.
+ */
+function buildImgWithFallback(propertyId, url, tipo, height, extraAttrs) {
+  height = height || 'h-40';
+  var phClass = imgPlaceholderClass(propertyId);
+  var tipoLabel = escHtml(tipo || 'Imagen');
+  extraAttrs = extraAttrs || '';
+  // ID único para el contenedor, así onerror puede referenciarlo
+  var containerId = 'img-c-' + (Math.random().toString(36).slice(2, 10));
+
+  return '<div id="' + containerId + '" class="relative ' + height + ' overflow-hidden rounded-lg" style="background:#1a1a2e">' +
+    '<img src="' + escHtml(url) + '" alt="' + escHtml(propertyId) + '" class="w-full h-full object-cover" ' + extraAttrs +
+      ' onerror="this.onerror=null;this.style.display=\'none\';var c=document.getElementById(\'' + containerId + '\');if(c)c.innerHTML=\'' +
+        escHtml(buildImgPlaceholderInner(propertyId, tipo)) + '\';" ' +
+      'onload="this.style.opacity=\'1\'" style="opacity:0;transition:opacity 0.3s" />' +
+  '</div>';
+}
+
+/** Versión inline del placeholder (sin el wrapper <div>). */
+function buildImgPlaceholderInner(propertyId, tipo) {
+  var phClass = imgPlaceholderClass(propertyId);
+  var tipoLabel = escHtml(tipo || 'Imagen');
+  return '<div class="' + phClass + ' w-full h-full flex flex-col items-center justify-center gap-1 p-3 text-center">' +
+    buildingIcon(48) +
+    '<span class="text-xs font-mono font-bold text-white/50">' + escHtml(propertyId || '—') + '</span>' +
+    '<span class="badge badge-tipo" style="font-size:10px">' + tipoLabel + '</span>' +
+  '</div>';
+}
+
+// ─── Helper: buildImgCard con imagen real ────────────────────────────────
+
 function buildImgCard(img, onClickAttr) {
   onClickAttr = onClickAttr || '';
-  var phClass = imgPlaceholderClass(img.property_id);
   var tipoLabel = escHtml(img.tipo || 'Imagen');
   return '<div class="img-card"' + onClickAttr + '>' +
-    '<div class="' + phClass + ' h-40 flex flex-col items-center justify-center gap-1 p-3 text-center">' +
-      buildingIcon(48) +
-      '<span class="text-xs font-mono font-bold text-white/50">' + escHtml(img.property_id) + '</span>' +
-      '<span class="badge badge-tipo" style="font-size:10px">' + tipoLabel + '</span>' +
-    '</div>' +
+    buildImgWithFallback(img.property_id, img.url, img.tipo, 'h-40') +
     '<div class="p-2">' +
       '<div class="flex items-center justify-between">' +
         '<span class="text-xs font-mono text-text-muted truncate">' + escHtml(img.property_id) + '</span>' +
@@ -75,13 +105,14 @@ async function searchSimilar(mediaId, sourceUrl) {
     '<span class="text-text-muted">→</span>' +
     '<span class="text-text-main">Similares a <span class="font-mono text-accent-cyan text-xs">' + escHtml(mediaId) + '</span></span>';
 
-  // Source image — placeholder elegante, nunca <img>
-  var phClass = imgPlaceholderClass(mediaId);
+  // Source image — con imagen real + fallback
   document.getElementById('img-source-card').innerHTML =
     '<div class="flex items-center gap-3 p-3 rounded-lg" style="background:rgba(59,130,246,0.08);border:1px solid rgba(59,130,246,0.25)">' +
-      '<div class="w-20 h-20 rounded-lg ' + phClass + ' flex flex-col items-center justify-center gap-0.5 text-center" style="flex-shrink:0">' +
-        buildingIcon(28) +
-        '<span class="text-[9px] font-mono text-white/50 truncate max-w-[70px]">' + escHtml(mediaId) + '</span>' +
+      '<div class="w-20 h-20 rounded-lg overflow-hidden flex-shrink-0" style="background:#1a1a2e">' +
+        '<img src="' + escHtml(sourceUrl) + '" alt="' + escHtml(mediaId) + '" class="w-full h-full object-cover" ' +
+          'onerror="this.onerror=null;var p=this.parentElement;p.innerHTML=\'' +
+            escHtml(buildingIcon(28)) + '\';p.className=\'w-20 h-20 rounded-lg flex flex-col items-center justify-center gap-0.5 \' + imgPlaceholderClass(\'' + escHtml(mediaId) + '\');" ' +
+          'onload="this.style.opacity=\'1\'" style="opacity:0;transition:opacity 0.3s" />' +
       '</div>' +
       '<div>' +
         '<div class="text-xs text-text-muted mb-1">Imagen fuente</div>' +
@@ -106,13 +137,9 @@ async function searchSimilar(mediaId, sourceUrl) {
       return;
     }
     resultsEl.innerHTML = imgs.map(function (img) {
-      var ph = imgPlaceholderClass(img.property_id);
       return '<div class="img-card">' +
         '<div class="relative h-36">' +
-          '<div class="' + ph + ' h-full flex flex-col items-center justify-center gap-1 p-2 text-center">' +
-            buildingIcon(36) +
-            '<span class="text-[10px] font-mono font-bold text-white/50">' + escHtml(img.property_id) + '</span>' +
-          '</div>' +
+          buildImgWithFallback(img.property_id, img.url, img.tipo, 'h-36') +
           '<span class="absolute top-2 right-2 score-badge ' + scoreClass(img.score) + '">' + img.score.toFixed(3) + '</span>' +
         '</div>' +
         '<div class="p-2 text-xs font-mono text-text-muted truncate">' + escHtml(img.property_id) + '</div>' +
@@ -180,13 +207,9 @@ async function doTextToImage() {
     }
 
     resultsEl.innerHTML = imgs.map(function (img) {
-      var ph = imgPlaceholderClass(img.property_id);
       return '<div class="img-card" onclick="searchSimilar(\'' + escHtml(img.media_id) + '\',\'' + escHtml(img.url) + '\')">' +
         '<div class="relative h-40">' +
-          '<div class="' + ph + ' h-full flex flex-col items-center justify-center gap-1 p-2 text-center">' +
-            buildingIcon(48) +
-            '<span class="text-xs font-mono font-bold text-white/50">' + escHtml(img.property_id) + '</span>' +
-          '</div>' +
+          buildImgWithFallback(img.property_id, img.url, img.tipo, 'h-40') +
           '<span class="absolute top-2 right-2 score-badge ' + scoreClass(img.score) + '">' + img.score.toFixed(3) + '</span>' +
         '</div>' +
         '<div class="p-2">' +

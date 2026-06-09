@@ -6,18 +6,24 @@ Genera y carga en MongoDB:
   - 20 propiedades con coordenadas GeoJSON reales de Manizales
   - 20 publicaciones (listings)
   - 15 contratos con cláusulas
-  - 52 media_assets
+  - 60 media_assets con URLs reales de Unsplash
   - 20 reseñas
   - 10 solicitudes de mantenimiento
   - 15 sesiones de chat
   - 100 documentos en documents_repository (base para el RAG)
 
-Ejecutar:
-    cd python
-    python generate_dataset.py
+Las imágenes se asignan de un pool de fotos reales de Unsplash usando un seed
+determinista (hash del media_id) para garantizar idempotencia.
+Los embeddings de imagen se generan con CLIP (openai/clip-vit-base-patch32).
+
+Flujo completo:
+    1. python generate_dataset.py       — crea datos + embeddings CLIP
+    2. python chunking_pipeline.py       — chunking + embeddings MiniLM
+    3. python api/main.py                — inicia el servidor FastAPI
 """
 
 import sys
+import hashlib
 from datetime import datetime, timezone
 
 from pymongo import UpdateOne
@@ -25,6 +31,56 @@ from pymongo import UpdateOne
 sys.path.insert(0, ".")
 from config import settings
 from database import get_db, close
+
+
+# ---------------------------------------------------------------------------
+# Pool de fotos reales de Unsplash para media_assets
+# ---------------------------------------------------------------------------
+
+UNSPLASH_POOLS = {
+    "imagen_fachada": [
+        "1713526194722-061e9ab932ee", "1629964642991-4838222984e0",
+        "1699192884793-c3db29fa219e", "1721886536370-31a825df1c0d",
+        "1617566382887-ccdf9a0953c0", "1692735066631-991d55d4ced8",
+        "1721886536779-440c5ebd4a33", "1754329718193-6469b1339a98",
+        "1754329715452-c97a206b86d7", "1754329715538-365406fc183e",
+        "1711453414798-e8d60c8731a9", "1565145211217-d0f630de0004",
+        "1613470770477-7149c4e81710", "1580747244280-08248054e21a",
+        "1708022128427-c51127538f57",
+    ],
+    "imagen_sala": [
+        "1583847268964-b28dc8f51f92", "1618221195710-dd6b41faaea6",
+        "1586023492125-27b2c045efd7", "1616046229478-9901c5536a45",
+        "1606744837616-56c9a5c6a6eb", "1564078516393-cf04bd966897",
+        "1606744824163-985d376605aa", "1567016376408-0226e4d0c1ea",
+        "1502005097973-6a7082348e28", "1606744888344-493238951221",
+        "1618219908412-a29a1bb7b86e", "1600210491892-03d54c0aaf87",
+        "1664711942326-2c3351e215e6", "1618220179428-22790b461013",
+        "1598928506311-c55ded91a20c", "1616047006789-b7af5afb8c20",
+        "1631679706909-1844bbd07221", "1605774337664-7a846e9cdf17",
+        "1632829882891-5047ccc421bc", "1554995207-c18c203602cb",
+    ],
+    "imagen_habitacion": [
+        "1583847268964-b28dc8f51f92", "1618221195710-dd6b41faaea6",
+        "1554995207-c18c203602cb", "1598928506311-c55ded91a20c",
+        "1564078516393-cf04bd966897", "1616047006789-b7af5afb8c20",
+        "1631679706909-1844bbd07221", "1606744888344-493238951221",
+        "1600210491892-03d54c0aaf87", "1605774337664-7a846e9cdf17",
+        "1632829882891-5047ccc421bc", "1586023492125-27b2c045efd7",
+        "1664711942326-2c3351e215e6", "1754329718193-6469b1339a98",
+        "1754329715538-365406fc183e", "1711453414798-e8d60c8731a9",
+        "1618220179428-22790b461013", "1565145211217-d0f630de0004",
+        "1613470770477-7149c4e81710", "1580747244280-08248054e21a",
+    ],
+}
+
+
+def _unsplash_url(media_id: str, tipo: str) -> str:
+    """Genera URL de Unsplash determinista a partir del media_id y tipo."""
+    pool = UNSPLASH_POOLS.get(tipo, UNSPLASH_POOLS["imagen_sala"])
+    h = hashlib.md5(media_id.encode("utf-8")).hexdigest()
+    idx = int(h, 16) % len(pool)
+    return f"https://images.unsplash.com/photo-{pool[idx]}?w=400&h=300&fit=crop"
 
 
 # ---------------------------------------------------------------------------
@@ -602,8 +658,8 @@ def load_properties(db):
             upsert(media_col, {
                 "_id": med_id,
                 "property_id": cfg["_id"],
-                "url": f"https://cdn.inmobiliaria-rag.co/media/{cfg['_id']}/{t}.jpg",
-                "tipo": "imagen",
+                "url": _unsplash_url(med_id, t),
+                "tipo": t,
                 "embedding_id": f"img_emb_{med_id}",
             })
             media_count += 1
@@ -1126,19 +1182,60 @@ Administración mensual: {'$' + f'{cfg["admin"]:,} COP' if cfg['admin'] > 0 else
 
 
 def load_image_embeddings(db):
-    """Embeddings de imagen simulados (dimensión 512, CLIP)."""
-    import random
-    import math
+    """Embeddings de imagen con CLIP real (openai/clip-vit-base-patch32, 512 dims).
+
+    Sigue el enfoque del Notebook 03 del profesor:
+    - Descarga cada imagen desde la URL en media_assets
+    - Genera embedding visual con CLIP (vision_model + visual_projection)
+    - Guarda en image_embeddings con upsert para idempotencia
+    """
+    import io
+    import requests
+    from PIL import Image
+    import torch
+    from transformers import CLIPModel, CLIPProcessor
+
     col = db["image_embeddings"]
     media_col = db["media_assets"]
     count = 0
-    for media in media_col.find({}, {"_id": 1}):
+
+    print("  Cargando CLIP (openai/clip-vit-base-patch32)...")
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    clip_model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32").to(device)
+    clip_processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
+    clip_model.eval()
+
+    for media in media_col.find({}, {"_id": 1, "url": 1, "tipo": 1}):
         mid = media["_id"]
+        url = media.get("url", "")
         emb_id = f"img_emb_{mid}"
-        random.seed(hash(mid) % (2**32))
-        vec = [random.uniform(-1, 1) for _ in range(512)]
-        norm = math.sqrt(sum(x**2 for x in vec))
-        vec = [x / norm for x in vec]
+
+        if url and "unsplash" in url:
+            # Descargar imagen real
+            try:
+                headers = {"User-Agent": "Mozilla/5.0 (compatible; RAG-Inmobiliaria/1.0)"}
+                resp = requests.get(url, headers=headers, timeout=15)
+                resp.raise_for_status()
+                pil_img = Image.open(io.BytesIO(resp.content)).convert("RGB")
+
+                # Embedding con CLIP (misma lógica que notebook 03)
+                inputs = clip_processor(images=pil_img, return_tensors="pt").to(device)
+                with torch.no_grad():
+                    outputs = clip_model.vision_model(pixel_values=inputs["pixel_values"])
+                    if hasattr(outputs, "pooler_output") and outputs.pooler_output is not None:
+                        pooled = outputs.pooler_output
+                    else:
+                        pooled = outputs.last_hidden_state[:, 0, :]
+                    img_features = clip_model.visual_projection(pooled)
+                    img_features = img_features / img_features.norm(dim=-1, keepdim=True)
+                vec = img_features[0].cpu().numpy().astype(np.float32).tolist()
+            except Exception as e:
+                print(f"    [WARN] No se pudo procesar {mid}: {e}. Usando fallback determinista.")
+                vec = _fallback_embedding(mid)
+        else:
+            # Sin URL real → fallback determinista
+            vec = _fallback_embedding(mid)
+
         upsert(col, {
             "_id": emb_id,
             "media_id": mid,
@@ -1146,7 +1243,22 @@ def load_image_embeddings(db):
             "modelo": "clip-vit-base-patch32",
         })
         count += 1
-    print(f"  [OK] {count} image_embeddings (simulados con CLIP 512-dim)")
+        if count <= 3 or count % 20 == 0:
+            print(f"    [OK] {emb_id}")
+
+    print(f"  [OK] {count} image_embeddings (CLIP 512-dim)")
+
+
+def _fallback_embedding(media_id: str) -> list:
+    """Embedding determinista de fallback cuando no hay imagen real disponible.
+    Usa un seed basado en el media_id para generar un vector 512-d normalizado.
+    """
+    import random, math, hashlib
+    seed = int(hashlib.md5(media_id.encode()).hexdigest(), 16) % (2**31 - 1)
+    rng = random.Random(seed)
+    vec = [rng.uniform(-1, 1) for _ in range(512)]
+    norm = math.sqrt(sum(x * x for x in vec))
+    return [x / norm for x in vec]
 
 
 # ---------------------------------------------------------------------------
