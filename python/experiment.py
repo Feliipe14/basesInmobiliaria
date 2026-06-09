@@ -68,7 +68,7 @@ def run_experiment():
                 "top_chunk": raw[0]["texto"][:200] if raw else "",
             })
 
-            # Guardar en rag_evaluations
+            # Guardar en rag_evaluations (omitir campos RAGAS — requieren LLM evaluador)
             eval_id = f"eval_exp_{strategy[:3]}_{int(time.time()*1000)}"
             db["rag_evaluations"].update_one(
                 {"_id": eval_id},
@@ -77,9 +77,6 @@ def run_experiment():
                     "rag_query_id": f"exp_{strategy}_{query[:20]}",
                     "relevancia": round(avg_score, 4),
                     "precision": round(min(avg_score * 1.05, 1.0), 4),
-                    "faithfulness": None,
-                    "answer_relevancy": None,
-                    "context_recall": None,
                     "modelo_eval": "cosine_similarity_proxy",
                     "fecha": datetime.now(timezone.utc).isoformat(),
                     "_meta": {

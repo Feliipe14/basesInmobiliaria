@@ -77,7 +77,7 @@ NEIGHBORHOODS = {
     "Palogrande": (5.0598, -75.5061, 5),
     "Belén":      (5.0802, -75.4823, 4),
     "La Sultana": (5.0566, -75.5152, 3),
-]
+}
 
 PROPERTY_CONFIGS = [
     {"_id": "prop_001", "owner": "u_001", "tipo": "apartamento", "barrio": "El Cable",   "area": 75,  "hab": 2, "ban": 2, "piso": 5,  "admin": 180000, "park": True,  "masc": False, "agent": "u_006"},
@@ -560,14 +560,14 @@ def load_users(db):
     col = db["users"]
     for u in USERS:
         upsert(col, u)
-    print(f"  ✓ {len(USERS)} usuarios")
+    print(f"  [OK] {len(USERS)} usuarios")
 
 
 def load_agencies(db):
     col = db["agencies"]
     for a in AGENCIES:
         upsert(col, a)
-    print(f"  ✓ {len(AGENCIES)} agencias")
+    print(f"  [OK] {len(AGENCIES)} agencias")
 
 
 def load_properties(db):
@@ -608,7 +608,7 @@ def load_properties(db):
             })
             media_count += 1
 
-    print(f"  ✓ {len(PROPERTY_CONFIGS)} propiedades, {media_count} media_assets")
+    print(f"  [OK] {len(PROPERTY_CONFIGS)} propiedades, {media_count} media_assets")
 
 
 def load_listings(db):
@@ -621,13 +621,14 @@ def load_listings(db):
 
         upsert(col, {
             "_id": f"list_{cfg['_id']}",
+            "codigo_listing": f"LST-{i:04d}",
             "property_id": cfg["_id"],
             "agent_id": cfg["agent"],
             "tipo": tipo_op,
-            "precio": int(precio),
+            "precio": float(precio),
             "estado": "activo",
         })
-    print(f"  ✓ {len(PROPERTY_CONFIGS)} listings")
+    print(f"  [OK] {len(PROPERTY_CONFIGS)} listings")
 
 
 def load_contracts(db):
@@ -668,7 +669,7 @@ def load_contracts(db):
             "document_id": f"doc_cont_{cid}",
             "_meta": {"dia": dia, "mes": mes, "year": year},
         })
-    print(f"  ✓ {len(contract_data)} contratos")
+    print(f"  [OK] {len(contract_data)} contratos")
     return contract_data
 
 
@@ -700,7 +701,7 @@ def load_reviews(db):
             "calificacion": cal,
             "comentario": com,
         })
-    print(f"  ✓ {len(reviews)} reseñas")
+    print(f"  [OK] {len(reviews)} reseñas")
 
 
 def load_maintenance(db):
@@ -725,7 +726,7 @@ def load_maintenance(db):
             "descripcion": desc,
             "estado": estado,
         })
-    print(f"  ✓ {len(requests)} solicitudes de mantenimiento")
+    print(f"  [OK] {len(requests)} solicitudes de mantenimiento")
 
 
 def load_documents(db, contract_data):
@@ -1120,7 +1121,7 @@ Administración mensual: {'$' + f'{cfg["admin"]:,} COP' if cfg['admin'] > 0 else
 
     for doc in docs:
         upsert(col, doc)
-    print(f"  ✓ {len(docs)} documentos en documents_repository")
+    print(f"  [OK] {len(docs)} documentos en documents_repository")
     return docs
 
 
@@ -1145,7 +1146,7 @@ def load_image_embeddings(db):
             "modelo": "clip-vit-base-patch32",
         })
         count += 1
-    print(f"  ✓ {count} image_embeddings (simulados con CLIP 512-dim)")
+    print(f"  [OK] {count} image_embeddings (simulados con CLIP 512-dim)")
 
 
 # ---------------------------------------------------------------------------
