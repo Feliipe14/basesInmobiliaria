@@ -25,7 +25,7 @@ from groq import Groq
 sys.path.insert(0, ".")
 from config import settings
 from database import get_db
-from chunking_pipeline import embed, vector_search_manual, STRATEGIES
+from chunking_pipeline import embed, vector_search
 
 from api.models import (
     SearchRequest, SearchResponse, ChunkResult,
@@ -181,7 +181,7 @@ def search(req: SearchRequest):
     Devuelve los `top_k` chunks más similares a la consulta.
     """
     db = get_db()
-    raw = vector_search_manual(
+    raw = vector_search(
         db,
         query=req.query,
         strategy=req.strategy,
@@ -210,7 +210,7 @@ def rag_query(req: RAGRequest):
     db = get_db()
     t0 = time.time()
 
-    raw = vector_search_manual(
+    raw = vector_search(
         db,
         query=req.query,
         strategy=req.strategy,
@@ -253,7 +253,7 @@ def compare_strategies(
     estrategias_result = []
 
     for strategy in ["fixed_size", "sentence", "semantic"]:
-        raw = vector_search_manual(db, query=query, strategy=strategy, top_k=top_k)
+        raw = vector_search(db, query=query, strategy=strategy, top_k=top_k)
         chunks = chunks_to_models(raw)
 
         total_en_db = db["document_chunks"].count_documents({"estrategia_chunking": strategy})
@@ -291,7 +291,7 @@ def experiment_results(top_k: int = Query(3, ge=1, le=10)):
     for query in CONSULTAS_EXPERIMENTO:
         for strategy in ["fixed_size", "sentence", "semantic"]:
             t0 = time.time()
-            raw = vector_search_manual(db, query=query, strategy=strategy, top_k=top_k)
+            raw = vector_search(db, query=query, strategy=strategy, top_k=top_k)
             chunks = chunks_to_models(raw)
             tiempo_ms = int((time.time() - t0) * 1000)
 

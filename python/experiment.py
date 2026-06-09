@@ -15,7 +15,7 @@ from datetime import datetime, timezone
 sys.path.insert(0, ".")
 from config import settings
 from database import get_db, close
-from chunking_pipeline import vector_search_manual
+from chunking_pipeline import vector_search
 
 CONSULTAS = [
     "¿Se permiten mascotas en el apartamento?",
@@ -48,7 +48,7 @@ def run_experiment():
     for query in CONSULTAS:
         for strategy in ESTRATEGIAS:
             t0 = time.time()
-            raw = vector_search_manual(db, query=query, strategy=strategy, top_k=TOP_K)
+            raw = vector_search(db, query=query, strategy=strategy, top_k=TOP_K)
             elapsed_ms = int((time.time() - t0) * 1000)
 
             n_chunks = len(raw)

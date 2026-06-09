@@ -20,7 +20,6 @@ import argparse
 from datetime import datetime, timezone
 from typing import List
 
-import numpy as np
 from sentence_transformers import SentenceTransformer
 from sklearn.metrics.pairwise import cosine_similarity
 from langchain_text_splitters import RecursiveCharacterTextSplitter
@@ -250,10 +249,21 @@ def run_pipeline(strategy_filter: str = "all"):
 
 
 # ---------------------------------------------------------------------------
-# Búsqueda vectorial manual (para Atlas M0 sin $vectorSearch)
+# Búsqueda vectorial real con Atlas $vectorSearch
 # ---------------------------------------------------------------------------
 
-def vector_search_manual(
+
+def build_filter(strategy: str | None, tipo_doc: str | None) -> dict:
+    """Construye el filtro para $vectorSearch a partir de parámetros opcionales."""
+    filtro: dict = {}
+    if strategy:
+        filtro["estrategia_chunking"] = strategy
+    if tipo_doc:
+        filtro["chunk_metadata.tipo_doc"] = tipo_doc
+    return filtro
+
+
+def vector_search(
     db,
     query: str,
     strategy: str | None = None,
@@ -261,52 +271,40 @@ def vector_search_manual(
     top_k: int = 5,
 ) -> List[dict]:
     """
-    Búsqueda vectorial mediante similitud coseno calculada en Python.
-    Válido en cualquier tier de MongoDB Atlas (incluyendo M0 gratuito).
+    Búsqueda vectorial real usando Atlas Vector Search ($vectorSearch).
+    Requiere el índice 'vector_index_chunks' creado en Atlas UI.
 
-    Para Atlas M10+, usar $vectorSearch en su lugar:
-        db.document_chunks.aggregate([
-          { $vectorSearch: {
-              index: "vector_index_chunks",
-              path: "embedding",
-              queryVector: <query_vec>,
-              numCandidates: 150,
-              limit: top_k,
-              filter: { "estrategia_chunking": strategy }  # opcional
-          }}
-        ])
+    La función genera el embedding de la consulta y ejecuta una agregación
+    con $vectorSearch, devolviendo los `top_k` chunks más similares junto
+    con su score de similitud vectorial provisto por Atlas.
     """
-    query_vec = np.array(embed([query])[0])
+    query_vec = embed([query])[0]
 
-    # Filtro por estrategia y/o tipo_doc si se especifican
-    mongo_filter = {}
-    if strategy:
-        mongo_filter["estrategia_chunking"] = strategy
-    if tipo_doc:
-        mongo_filter["chunk_metadata.tipo_doc"] = tipo_doc
+    pipeline: list[dict] = [
+        {
+            "$vectorSearch": {
+                "index": "vector_index_chunks",
+                "path": "embedding",
+                "queryVector": query_vec,
+                "numCandidates": 100,
+                "limit": top_k,
+                **({"filter": build_filter(strategy, tipo_doc)} if strategy or tipo_doc else {}),
+            }
+        },
+        {
+            "$project": {
+                "_id": 1,
+                "texto": 1,
+                "doc_id": 1,
+                "chunk_index": 1,
+                "estrategia_chunking": 1,
+                "chunk_metadata": 1,
+                "score": {"$meta": "vectorSearchScore"},
+            }
+        },
+    ]
 
-    col = db["document_chunks"]
-    cursor = col.find(mongo_filter, {"_id": 1, "texto": 1, "embedding": 1,
-                                    "doc_id": 1, "estrategia_chunking": 1,
-                                    "chunk_metadata": 1})
-
-    results = []
-    for chunk in cursor:
-        vec = np.array(chunk["embedding"])
-        if vec.shape[0] != query_vec.shape[0]:
-            continue
-        score = float(np.dot(query_vec, vec))  # vectores ya normalizados → dot = cosine
-        results.append({
-            "_id": chunk["_id"],
-            "texto": chunk["texto"],
-            "doc_id": chunk["doc_id"],
-            "estrategia_chunking": chunk["estrategia_chunking"],
-            "chunk_metadata": chunk.get("chunk_metadata", {}),
-            "score": score,
-        })
-
-    results.sort(key=lambda x: x["score"], reverse=True)
-    return results[:top_k]
+    return list(db["document_chunks"].aggregate(pipeline))
 
 
 # ---------------------------------------------------------------------------
