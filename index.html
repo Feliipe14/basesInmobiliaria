@@ -1,0 +1,1431 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>RAG Inmobiliaria Manizales</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+tailwind.config = {
+  theme: {
+    extend: {
+      colors: {
+        'bg-base':    '#070d1a',
+        'bg-surface': '#0d1526',
+        'bg-elev':    '#111d35',
+        'accent-blue':  '#3b82f6',
+        'accent-cyan':  '#06b6d4',
+        'accent-gold':  '#f59e0b',
+        'accent-green': '#10b981',
+        'accent-red':   '#ef4444',
+        'text-main':  '#f0f6ff',
+        'text-muted': '#64748b',
+      },
+      fontFamily: {
+        sans: ['Inter','sans-serif'],
+        mono: ['JetBrains Mono','monospace'],
+      },
+    }
+  }
+}
+</script>
+<style>
+:root {
+  --bg-base:#070d1a; --bg-surface:#0d1526; --bg-elevated:#111d35;
+  --border:rgba(99,179,237,0.12);
+  --accent-blue:#3b82f6; --accent-cyan:#06b6d4; --accent-gold:#f59e0b;
+  --accent-green:#10b981; --accent-red:#ef4444;
+  --text-primary:#f0f6ff; --text-muted:#64748b;
+  --gradient-hero:linear-gradient(135deg,#1e3a5f 0%,#0d1526 50%,#0a1628 100%);
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Inter',sans-serif;background:var(--bg-base);color:var(--text-primary);min-height:100vh;display:flex;}
+a{color:inherit;text-decoration:none;}
+
+/* Scrollbar */
+::-webkit-scrollbar{width:6px;height:6px;}
+::-webkit-scrollbar-track{background:var(--bg-base);}
+::-webkit-scrollbar-thumb{background:rgba(59,130,246,0.3);border-radius:3px;}
+
+/* Sidebar */
+#sidebar{width:280px;min-height:100vh;background:var(--bg-surface);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;position:fixed;top:0;left:0;height:100vh;overflow-y:auto;z-index:40;}
+#main-content{margin-left:280px;flex:1;min-height:100vh;overflow-y:auto;}
+
+/* Sidebar logo gradient */
+.sidebar-logo-bg{background:linear-gradient(135deg,#1e3a5f,#0d2040);border-bottom:1px solid var(--border);}
+
+/* Nav item */
+.nav-item{display:flex;align-items:center;gap:10px;padding:10px 16px;border-radius:8px;cursor:pointer;transition:all .2s;color:var(--text-muted);font-size:14px;font-weight:500;margin:2px 8px;border-left:3px solid transparent;}
+.nav-item:hover{background:var(--bg-elevated);color:var(--text-primary);}
+.nav-item.active{background:var(--bg-elevated);color:var(--text-primary);border-left-color:var(--accent-blue);}
+.nav-item svg{width:18px;height:18px;flex-shrink:0;}
+
+/* Cards */
+.card{background:rgba(13,21,38,0.8);backdrop-filter:blur(20px);border:1px solid var(--border);border-radius:12px;transition:all .2s;}
+.card:hover{box-shadow:0 0 20px rgba(59,130,246,0.15);}
+.card-stat{padding:20px;background:var(--bg-surface);border:1px solid var(--border);border-radius:12px;transition:all .2s;}
+.card-stat:hover{border-color:rgba(59,130,246,0.3);box-shadow:0 0 20px rgba(59,130,246,0.1);}
+
+/* Glassmorphism hero */
+.hero{background:var(--gradient-hero);border-radius:16px;border:1px solid var(--border);position:relative;overflow:hidden;}
+.hero::before{content:'';position:absolute;inset:0;background-image:radial-gradient(circle,rgba(59,130,246,0.15) 1px,transparent 1px);background-size:28px 28px;pointer-events:none;}
+
+/* Section */
+.section{display:none;}
+.section.active{display:block;}
+
+/* Badges */
+.badge{display:inline-flex;align-items:center;padding:2px 10px;border-radius:9999px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;}
+.badge-fs{background:rgba(99,102,241,0.2);color:#a5b4fc;border:1px solid rgba(99,102,241,0.3);}
+.badge-sn{background:rgba(6,182,212,0.2);color:#67e8f9;border:1px solid rgba(6,182,212,0.3);}
+.badge-sm{background:rgba(16,185,129,0.2);color:#6ee7b7;border:1px solid rgba(16,185,129,0.3);}
+.badge-tipo{background:rgba(59,130,246,0.15);color:#93c5fd;border:1px solid rgba(59,130,246,0.2);}
+.badge-gold{background:rgba(245,158,11,0.2);color:#fcd34d;border:1px solid rgba(245,158,11,0.4);}
+.badge-green{background:rgba(16,185,129,0.2);color:#6ee7b7;border:1px solid rgba(16,185,129,0.3);}
+
+/* Score bar */
+.score-bar-wrap{height:6px;border-radius:3px;background:rgba(255,255,255,0.07);overflow:hidden;}
+.score-bar-fill{height:100%;border-radius:3px;transition:width .5s ease;}
+
+/* Buttons */
+.btn-primary{display:inline-flex;align-items:center;gap:8px;padding:10px 20px;background:var(--accent-blue);color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;transition:all .2s;}
+.btn-primary:hover{background:#2563eb;box-shadow:0 0 16px rgba(59,130,246,0.4);}
+.btn-primary:disabled{opacity:.5;cursor:not-allowed;}
+.btn-secondary{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;background:var(--bg-elevated);color:var(--text-muted);border:1px solid var(--border);border-radius:8px;font-size:13px;cursor:pointer;transition:all .2s;}
+.btn-secondary:hover{color:var(--text-primary);border-color:rgba(99,179,237,0.3);}
+.btn-query{display:inline-flex;align-items:center;gap:6px;padding:6px 14px;background:var(--bg-elevated);color:var(--text-muted);border:1px solid var(--border);border-radius:8px;font-size:12px;cursor:pointer;transition:all .2s;text-align:left;}
+.btn-query:hover,.btn-query.selected{background:rgba(59,130,246,0.15);color:#93c5fd;border-color:rgba(59,130,246,0.3);}
+
+/* Form elements */
+textarea,input[type=text],select{background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px;color:var(--text-primary);padding:10px 14px;font-family:'Inter',sans-serif;font-size:14px;width:100%;outline:none;transition:border-color .2s;}
+textarea:focus,input[type=text]:focus,select:focus{border-color:var(--accent-blue);box-shadow:0 0 0 3px rgba(59,130,246,0.1);}
+textarea::placeholder,input::placeholder{color:var(--text-muted);}
+select option{background:var(--bg-elevated);}
+input[type=range]{accent-color:var(--accent-blue);}
+
+/* Chunk card */
+.chunk-card{background:var(--bg-surface);border:1px solid var(--border);border-radius:10px;padding:14px;transition:all .2s;}
+.chunk-card:hover{border-color:rgba(59,130,246,0.2);}
+.chunk-text{font-size:13px;line-height:1.6;color:#cbd5e1;overflow:hidden;max-height:80px;transition:max-height .3s;}
+.chunk-text.expanded{max-height:1000px;}
+.chunk-more{color:var(--accent-blue);font-size:12px;cursor:pointer;margin-top:4px;display:inline-block;}
+
+/* Score badge */
+.score-badge{font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:600;padding:3px 8px;border-radius:6px;}
+.score-ex{background:rgba(16,185,129,0.2);color:#6ee7b7;}
+.score-good{background:rgba(59,130,246,0.2);color:#93c5fd;}
+.score-mod{background:rgba(245,158,11,0.2);color:#fcd34d;}
+.score-low{background:rgba(100,116,139,0.2);color:#94a3b8;}
+
+/* Skeleton */
+@keyframes shimmer{0%{background-position:-400px 0}100%{background-position:400px 0}}
+.skeleton{background:linear-gradient(90deg,var(--bg-surface) 25%,var(--bg-elevated) 50%,var(--bg-surface) 75%);background-size:400px 100%;animation:shimmer 1.5s infinite;border-radius:8px;}
+
+/* Spinner */
+@keyframes spin{to{transform:rotate(360deg)}}
+.spinner{display:inline-block;width:16px;height:16px;border:2px solid rgba(255,255,255,0.2);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;}
+
+/* Toast */
+#toast-container{position:fixed;bottom:24px;right:24px;z-index:9999;display:flex;flex-direction:column;gap:8px;}
+.toast{padding:12px 20px;border-radius:10px;font-size:13px;font-weight:500;box-shadow:0 8px 32px rgba(0,0,0,0.4);transform:translateX(120%);transition:transform .3s ease;min-width:260px;}
+.toast.show{transform:translateX(0);}
+.toast-success{background:rgba(16,185,129,0.95);color:#fff;}
+.toast-error{background:rgba(239,68,68,0.95);color:#fff;}
+.toast-info{background:rgba(59,130,246,0.95);color:#fff;}
+
+/* API status pulse */
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.pulse-dot{width:8px;height:8px;border-radius:50%;display:inline-block;}
+.pulse-online{background:var(--accent-green);animation:pulse 2s infinite;}
+.pulse-offline{background:var(--accent-red);}
+
+/* Callout */
+.callout{background:rgba(59,130,246,0.06);border:1px solid rgba(59,130,246,0.2);border-left:3px solid var(--accent-blue);border-radius:8px;padding:14px 16px;font-size:13px;line-height:1.6;color:#94a3b8;}
+.callout-gold{background:rgba(245,158,11,0.06);border-color:rgba(245,158,11,0.2);border-left-color:var(--accent-gold);}
+.callout-green{background:rgba(16,185,129,0.06);border-color:rgba(16,185,129,0.2);border-left-color:var(--accent-green);}
+
+/* Offline banner */
+#offline-banner{display:none;background:rgba(239,68,68,0.1);border-bottom:1px solid rgba(239,68,68,0.3);padding:10px 20px;font-size:13px;color:#fca5a5;position:sticky;top:0;z-index:30;}
+
+/* Header section */
+.section-header{background:var(--bg-surface);border-bottom:1px solid var(--border);padding:16px 28px;position:sticky;top:0;z-index:20;}
+
+/* Count up */
+@keyframes countUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.count-anim{animation:countUp .5s ease forwards;}
+
+/* Image card */
+.img-card{background:var(--bg-surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;transition:all .2s;cursor:pointer;}
+.img-card:hover{border-color:rgba(59,130,246,0.3);transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,0,0,0.3);}
+.img-placeholder{background:var(--bg-elevated);display:flex;align-items:center;justify-content:center;height:160px;color:var(--text-muted);}
+
+/* Table */
+.data-table{width:100%;border-collapse:collapse;font-size:13px;}
+.data-table th{background:var(--bg-elevated);color:var(--text-muted);font-weight:600;text-transform:uppercase;font-size:11px;letter-spacing:.5px;padding:10px 12px;text-align:left;border-bottom:1px solid var(--border);cursor:pointer;user-select:none;}
+.data-table th:hover{color:var(--text-primary);}
+.data-table td{padding:9px 12px;border-bottom:1px solid rgba(99,179,237,0.06);vertical-align:middle;}
+.data-table tr:hover td{background:rgba(59,130,246,0.04);}
+.data-table tr.winner td{background:rgba(16,185,129,0.06);}
+.data-table tr.group-sep td{border-bottom:2px solid rgba(99,179,237,0.12);}
+
+/* Progress step */
+.progress-step{display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:8px;font-size:13px;transition:all .3s;}
+.progress-step.active{background:rgba(59,130,246,0.1);color:var(--text-primary);}
+.progress-step.done{color:var(--accent-green);}
+.progress-step.waiting{color:var(--text-muted);}
+
+/* Heatmap cell */
+.heat-cell{padding:6px 10px;text-align:center;font-family:'JetBrains Mono',monospace;font-size:11px;border:1px solid var(--border);}
+
+/* Mobile */
+@media(max-width:768px){
+  #sidebar{width:100%;height:auto;position:relative;min-height:unset;flex-direction:row;flex-wrap:wrap;}
+  #main-content{margin-left:0;}
+  .sidebar-nav{display:flex;flex-wrap:wrap;gap:4px;padding:8px;}
+  .nav-item{margin:0;padding:8px 10px;font-size:12px;}
+  .compare-grid{grid-template-columns:1fr!important;}
+}
+</style>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<aside id="sidebar">
+  <div class="sidebar-logo-bg p-5">
+    <div class="flex items-center gap-3 mb-1">
+      <svg class="w-9 h-9 flex-shrink-0" viewBox="0 0 36 36" fill="none">
+        <defs><linearGradient id="hg" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#3b82f6"/><stop offset="100%" stop-color="#06b6d4"/></linearGradient></defs>
+        <path d="M18 3L4 14v19h9v-9h10v9h9V14L18 3z" fill="url(#hg)" opacity=".9"/>
+        <rect x="14" y="22" width="8" height="8" rx="1" fill="rgba(255,255,255,0.15)"/>
+      </svg>
+      <div>
+        <div class="font-bold text-text-main text-base leading-tight">RAG Inmobiliaria</div>
+        <div class="text-text-muted text-xs mt-0.5">Manizales, Caldas</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- API Status -->
+  <div class="px-4 py-3 border-b" style="border-color:var(--border)">
+    <button onclick="checkApi()" class="flex items-center gap-2 w-full text-left hover:opacity-80 transition-opacity">
+      <span id="api-dot" class="pulse-dot pulse-offline"></span>
+      <span id="api-text" class="text-xs text-text-muted">Verificando API...</span>
+    </button>
+  </div>
+
+  <!-- Nav -->
+  <nav class="flex-1 py-3 sidebar-nav">
+    <div class="nav-item active" data-section="dashboard" onclick="navigate('dashboard',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+      Dashboard
+    </div>
+    <div class="nav-item" data-section="search" onclick="navigate('search',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+      Búsqueda Semántica
+    </div>
+    <div class="nav-item" data-section="rag" onclick="navigate('rag',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v18m0 0h10a2 2 0 0 0 2-2v-4M9 21H5a2 2 0 0 1-2-2v-4m0 0h18"/></svg>
+      Consulta RAG
+    </div>
+    <div class="nav-item" data-section="images" onclick="navigate('images',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
+      Búsqueda Imágenes
+    </div>
+    <div class="nav-item" data-section="compare" onclick="navigate('compare',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 20V10M12 20V4M6 20v-6"/></svg>
+      Comparar Estrategias
+    </div>
+    <div class="nav-item" data-section="experiment" onclick="navigate('experiment',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2h-4m-6 0v6l2 2 2-2V3m-4 0h4"/></svg>
+      Experimento
+    </div>
+    <div class="nav-item" data-section="evaluations" onclick="navigate('evaluations',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 19v-6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2zm0 0V9a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v10m-6 0a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2m0 0V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v14a2 2 0 0 0-2 2h-2a2 2 0 0 0-2-2z"/></svg>
+      Evaluaciones RAGAS
+    </div>
+  </nav>
+
+  <!-- Footer -->
+  <div class="p-4 border-t space-y-2" style="border-color:var(--border)">
+    <div class="flex items-center gap-2 text-xs text-text-muted">
+      <svg class="w-3.5 h-3.5 text-accent-green flex-shrink-0" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 18a8 8 0 1 1 8-8 8 8 0 0 1-8 8z" opacity=".3"/><path d="M12 6c-3.31 0-6 2.69-6 6s2.69 6 6 6 6-2.69 6-6-2.69-6-6-6z" fill="#10b981"/></svg>
+      MongoDB Atlas
+    </div>
+    <div class="flex items-center gap-2 text-xs text-text-muted">
+      <svg class="w-3.5 h-3.5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="#06b6d4" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M9 9h6M9 12h6M9 15h4"/></svg>
+      all-MiniLM-L6-v2
+    </div>
+    <div class="flex items-center gap-2 text-xs text-text-muted">
+      <svg class="w-3.5 h-3.5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+      Groq Llama 3.1
+    </div>
+  </div>
+</aside>
+
+<!-- MAIN -->
+<main id="main-content">
+  <!-- Offline Banner -->
+  <div id="offline-banner">
+    <strong>⚠ API desconectada.</strong> Para iniciar: <code class="bg-black/30 px-1 rounded">cd python &amp;&amp; uvicorn api.main:app --reload --port 8000</code>
+  </div>
+
+  <!-- ================================================================ SECTION: DASHBOARD -->
+  <section id="sec-dashboard" class="section active">
+    <div class="section-header">
+      <div class="text-xs text-text-muted mb-0.5">RAG Inmobiliaria</div>
+      <h1 class="text-lg font-bold text-text-main">Dashboard</h1>
+    </div>
+    <div class="p-7 max-w-6xl mx-auto space-y-7">
+
+      <!-- Hero -->
+      <div class="hero p-8">
+        <h2 class="text-3xl font-extrabold text-white mb-2">Sistema RAG Inmobiliaria</h2>
+        <p class="text-base text-blue-200 max-w-2xl">Búsqueda semántica inteligente sobre documentos inmobiliarios de Manizales, Caldas. Powered by MongoDB Atlas · Sentence Transformers · Groq Llama 3.1.</p>
+        <div class="flex flex-wrap gap-2 mt-4">
+          <span class="badge badge-fs">fixed_size</span>
+          <span class="badge badge-sn">sentence</span>
+          <span class="badge badge-sm">semantic</span>
+          <span class="badge badge-gold">RAGAS</span>
+        </div>
+      </div>
+
+      <!-- Stat cards -->
+      <div id="stat-cards" class="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div class="skeleton h-28"></div><div class="skeleton h-28"></div>
+        <div class="skeleton h-28"></div><div class="skeleton h-28"></div>
+      </div>
+
+      <!-- Chunks por estrategia -->
+      <div id="chunk-strategy-cards" class="grid grid-cols-1 md:grid-cols-3 gap-4"></div>
+
+      <!-- 5 Consultas predefinidas -->
+      <div>
+        <h3 class="text-base font-semibold text-text-main mb-1">Consultas Predefinidas — 5 Ejemplos de Evidencia</h3>
+        <p class="text-xs text-text-muted mb-4">Haz clic en una consulta para probarla directamente en el pipeline RAG.</p>
+        <div id="example-queries-dash" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3"></div>
+      </div>
+
+      <!-- Sistema status -->
+      <div class="card p-5">
+        <h3 class="text-sm font-semibold text-text-main mb-3">Estado del Sistema</h3>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+          <div>
+            <div class="text-text-muted text-xs mb-1">Evaluaciones guardadas</div>
+            <div id="dash-eval-count" class="text-accent-green font-mono text-lg font-bold">—</div>
+          </div>
+          <div>
+            <div class="text-text-muted text-xs mb-1">Consultas log</div>
+            <div id="dash-log-count" class="text-accent-cyan font-mono text-lg font-bold">—</div>
+          </div>
+          <div>
+            <div class="text-text-muted text-xs mb-1">Stack tecnológico</div>
+            <div class="flex flex-wrap gap-1 mt-1">
+              <span class="badge badge-fs" style="font-size:10px">FastAPI</span>
+              <span class="badge badge-sn" style="font-size:10px">MongoDB</span>
+              <span class="badge badge-sm" style="font-size:10px">CLIP 512d</span>
+              <span class="badge badge-gold" style="font-size:10px">Llama 3.1</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================================================================ SECTION: SEARCH -->
+  <section id="sec-search" class="section">
+    <div class="section-header">
+      <div class="text-xs text-text-muted mb-0.5">RAG Inmobiliaria</div>
+      <h1 class="text-lg font-bold text-text-main">Búsqueda Semántica</h1>
+    </div>
+    <div class="p-7 max-w-5xl mx-auto space-y-5">
+      <div class="card p-5 space-y-4">
+        <div>
+          <label class="text-xs font-semibold text-text-muted uppercase tracking-wider mb-2 block">Consulta</label>
+          <textarea id="search-query" rows="3" placeholder="Ej: ¿Se permiten mascotas en el conjunto?&#10;Ej: ¿Cuál es el valor del arriendo?&#10;Ej: ¿Qué incluye el contrato de arrendamiento?"></textarea>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <div>
+            <label class="text-xs text-text-muted mb-1 block">Estrategia</label>
+            <select id="search-strategy">
+              <option value="">Todas las estrategias</option>
+              <option value="fixed_size">fixed_size</option>
+              <option value="sentence">sentence</option>
+              <option value="semantic">semantic</option>
+            </select>
+          </div>
+          <div>
+            <label class="text-xs text-text-muted mb-1 block">Tipo de documento</label>
+            <select id="search-tipo">
+              <option value="">Todos</option>
+              <option value="descripcion_propiedad">descripcion_propiedad</option>
+              <option value="contrato">contrato</option>
+              <option value="reglamento_copropiedad">reglamento_copropiedad</option>
+              <option value="chat">chat</option>
+              <option value="faq">faq</option>
+              <option value="reporte_mercado">reporte_mercado</option>
+              <option value="guia_mantenimiento">guia_mantenimiento</option>
+            </select>
+          </div>
+          <div>
+            <label class="text-xs text-text-muted mb-1 block">Top K <span id="search-k-val" class="text-accent-blue font-mono">5</span></label>
+            <div class="flex items-center gap-2">
+              <button onclick="adjustK('search-k','search-k-val',-1)" class="btn-secondary px-3 py-2">−</button>
+              <input type="range" id="search-k" min="1" max="10" value="5" oninput="document.getElementById('search-k-val').textContent=this.value" class="flex-1"/>
+              <button onclick="adjustK('search-k','search-k-val',1)" class="btn-secondary px-3 py-2">+</button>
+            </div>
+          </div>
+        </div>
+        <div class="flex gap-3 flex-wrap">
+          <button id="btn-search" onclick="doSearch()" class="btn-primary">
+            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+            Buscar
+          </button>
+          <button onclick="clearSearch()" class="btn-secondary">Limpiar</button>
+        </div>
+      </div>
+
+      <div id="search-results"></div>
+
+      <div class="callout">
+        <strong class="text-blue-300">¿Qué es la búsqueda semántica?</strong> A diferencia de la búsqueda por palabras clave, la búsqueda semántica convierte tu consulta en un vector de 384 dimensiones mediante el modelo <em>all-MiniLM-L6-v2</em>. Luego calcula la <strong>similitud coseno</strong> entre ese vector y los chunks almacenados en MongoDB Atlas. Un score de 1.0 indica identidad perfecta, 0.7+ indica alta relevancia semántica.
+      </div>
+    </div>
+  </section>
+
+  <!-- ================================================================ SECTION: RAG -->
+  <section id="sec-rag" class="section">
+    <div class="section-header">
+      <div class="text-xs text-text-muted mb-0.5">RAG Inmobiliaria</div>
+      <h1 class="text-lg font-bold text-text-main">Consulta RAG</h1>
+    </div>
+    <div class="p-7 max-w-4xl mx-auto space-y-5">
+
+      <!-- Consultas rápidas -->
+      <div>
+        <div class="text-xs text-text-muted mb-2 uppercase tracking-wider font-semibold">5 Consultas de Evidencia</div>
+        <div id="rag-quick-btns" class="flex flex-wrap gap-2"></div>
+      </div>
+
+      <div class="card p-5 space-y-4">
+        <div>
+          <label class="text-xs font-semibold text-text-muted uppercase tracking-wider mb-2 block">Pregunta al Sistema</label>
+          <textarea id="rag-query" rows="4" placeholder="Ej: ¿Se permiten mascotas en el conjunto Torre El Cable?"></textarea>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div>
+            <label class="text-xs text-text-muted mb-1 block">Estrategia de chunking</label>
+            <select id="rag-strategy">
+              <option value="semantic">semantic (recomendado)</option>
+              <option value="sentence">sentence</option>
+              <option value="fixed_size">fixed_size</option>
+            </select>
+          </div>
+          <div>
+            <label class="text-xs text-text-muted mb-1 block">Chunks de contexto (top_k): <span id="rag-k-val" class="text-accent-blue font-mono">5</span></label>
+            <input type="range" id="rag-k" min="1" max="10" value="5" oninput="document.getElementById('rag-k-val').textContent=this.value" class="w-full mt-2"/>
+          </div>
+        </div>
+        <div class="flex items-center gap-3 flex-wrap">
+          <button id="btn-rag" onclick="doRag()" class="btn-primary">
+            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v18m0 0h10a2 2 0 0 0 2-2v-4M9 21H5a2 2 0 0 1-2-2v-4m0 0h18"/></svg>
+            Preguntar al RAG
+          </button>
+          <div class="flex items-center gap-2 text-xs text-text-muted bg-bg-elev px-3 py-2 rounded-full border" style="border-color:var(--border)">
+            <svg class="w-3.5 h-3.5 text-accent-gold" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+            Powered by Llama 3.1 via Groq
+          </div>
+        </div>
+      </div>
+
+      <!-- Loading steps -->
+      <div id="rag-loading" class="card p-5 hidden">
+        <div class="text-sm font-semibold text-text-main mb-3">Procesando consulta RAG...</div>
+        <div class="space-y-2">
+          <div id="rag-step-1" class="progress-step waiting">
+            <svg class="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M9 9h6M9 12h6M9 15h4"/></svg>
+            Generando embedding de la consulta...
+          </div>
+          <div id="rag-step-2" class="progress-step waiting">
+            <svg class="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+            Recuperando contexto de MongoDB Atlas...
+          </div>
+          <div id="rag-step-3" class="progress-step waiting">
+            <svg class="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+            Generando respuesta con Llama 3.1...
+          </div>
+        </div>
+        <div class="mt-3 w-full bg-bg-elev rounded-full h-1.5 overflow-hidden">
+          <div id="rag-progress-bar" class="h-full bg-accent-blue rounded-full transition-all duration-500" style="width:0%"></div>
+        </div>
+      </div>
+
+      <div id="rag-result"></div>
+    </div>
+  </section>
+
+  <!-- ================================================================ SECTION: IMAGES -->
+  <section id="sec-images" class="section">
+    <div class="section-header">
+      <div class="text-xs text-text-muted mb-0.5">RAG Inmobiliaria</div>
+      <h1 class="text-lg font-bold text-text-main">Búsqueda de Imágenes (Multimodal)</h1>
+    </div>
+    <div class="p-7 max-w-6xl mx-auto space-y-5">
+      <!-- Breadcrumb -->
+      <div id="img-breadcrumb" class="flex items-center gap-2 text-sm text-text-muted">
+        <span class="cursor-pointer hover:text-accent-blue" onclick="showGallery()">Galería</span>
+      </div>
+
+      <!-- Gallery panel -->
+      <div id="img-gallery-panel">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="text-sm font-semibold text-text-main">Catálogo de Imágenes de Propiedades</h3>
+          <button onclick="loadImages()" class="btn-secondary text-xs">
+            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 4v6h6M23 20v-6h-6"/><path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4-4.64 4.36A9 9 0 0 1 3.51 15"/></svg>
+            Recargar
+          </button>
+        </div>
+        <div id="img-gallery" class="grid grid-cols-2 md:grid-cols-4 gap-3"></div>
+      </div>
+
+      <!-- Similar images panel -->
+      <div id="img-similar-panel" class="hidden space-y-4">
+        <div class="flex items-center gap-3 mb-2">
+          <button onclick="showGallery()" class="btn-secondary text-xs">← Volver a galería</button>
+          <span class="text-sm text-text-muted">Imágenes similares a: <span id="similar-source-id" class="text-accent-cyan font-mono text-xs"></span></span>
+        </div>
+        <div id="img-source-card"></div>
+        <h3 class="text-sm font-semibold text-text-main mt-2">Resultados similares</h3>
+        <div id="img-similar-results" class="grid grid-cols-2 md:grid-cols-3 gap-3"></div>
+      </div>
+
+      <div class="callout">
+        <strong class="text-blue-300">Búsqueda multimodal imagen-imagen:</strong> Usa embeddings CLIP de 512 dimensiones almacenados en la colección <code class="text-accent-cyan">image_embeddings</code> de MongoDB. La similitud se calcula mediante <strong>Atlas Vector Search</strong> con producto punto entre vectores normalizados (equivalente a similitud coseno). Modelo: ViT-B/32 de OpenAI CLIP.
+      </div>
+    </div>
+  </section>
+
+  <!-- ================================================================ SECTION: COMPARE -->
+  <section id="sec-compare" class="section">
+    <div class="section-header">
+      <div class="text-xs text-text-muted mb-0.5">RAG Inmobiliaria</div>
+      <h1 class="text-lg font-bold text-text-main">Comparar Estrategias de Chunking</h1>
+    </div>
+    <div class="p-7 max-w-6xl mx-auto space-y-5">
+      <div class="card p-5 space-y-4">
+        <div>
+          <label class="text-xs font-semibold text-text-muted uppercase tracking-wider mb-2 block">Consulta a comparar</label>
+          <input type="text" id="compare-query" placeholder="Ej: ¿Se permiten mascotas?" class="mb-2"/>
+          <div id="compare-quick" class="flex flex-wrap gap-2 mt-2"></div>
+        </div>
+        <div class="flex items-center gap-3">
+          <div>
+            <label class="text-xs text-text-muted mb-1 block">Top K: <span id="compare-k-val" class="text-accent-blue font-mono">3</span></label>
+            <input type="range" id="compare-k" min="1" max="8" value="3" oninput="document.getElementById('compare-k-val').textContent=this.value" class="w-32"/>
+          </div>
+          <button id="btn-compare" onclick="doCompare()" class="btn-primary ml-2">
+            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 20V10M12 20V4M6 20v-6"/></svg>
+            Comparar las 3 estrategias
+          </button>
+        </div>
+      </div>
+
+      <div id="compare-results"></div>
+    </div>
+  </section>
+
+  <!-- ================================================================ SECTION: EXPERIMENT -->
+  <section id="sec-experiment" class="section">
+    <div class="section-header">
+      <div class="text-xs text-text-muted mb-0.5">RAG Inmobiliaria</div>
+      <h1 class="text-lg font-bold text-text-main">Experimento de Chunking</h1>
+    </div>
+    <div class="p-7 max-w-6xl mx-auto space-y-6">
+      <div class="card p-5">
+        <div class="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h2 class="text-base font-semibold text-text-main mb-1">Experimento — Componente Obligatorio</h2>
+            <p class="text-sm text-text-muted max-w-xl">10 consultas predefinidas ejecutadas sobre las 3 estrategias de chunking (30 experimentos). Evidencia el impacto en la calidad de recuperación del RAG.</p>
+          </div>
+          <div class="flex items-center gap-3">
+            <div>
+              <label class="text-xs text-text-muted mb-1 block">Top K: <span id="exp-k-val" class="text-accent-blue font-mono">3</span></label>
+              <input type="range" id="exp-k" min="1" max="8" value="3" oninput="document.getElementById('exp-k-val').textContent=this.value" class="w-28"/>
+            </div>
+            <button id="btn-experiment" onclick="doExperiment()" class="btn-primary">
+              <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2h-4m-6 0v6l2 2 2-2V3m-4 0h4"/></svg>
+              Ejecutar Experimento
+            </button>
+          </div>
+        </div>
+        <div class="callout-gold callout mt-3 text-xs">⏱ Este experimento puede tardar 15-30 segundos mientras ejecuta 30 búsquedas vectoriales.</div>
+      </div>
+
+      <div id="exp-loading" class="hidden card p-5">
+        <div class="text-sm font-semibold text-text-main mb-2">Ejecutando 30 experimentos...</div>
+        <div class="w-full bg-bg-elev rounded-full h-2 overflow-hidden">
+          <div class="h-full bg-accent-blue rounded-full animate-pulse" style="width:60%"></div>
+        </div>
+        <div class="text-xs text-text-muted mt-2">Por favor espera, esto puede tardar unos segundos...</div>
+      </div>
+
+      <div id="exp-results"></div>
+    </div>
+  </section>
+
+  <!-- ================================================================ SECTION: EVALUATIONS -->
+  <section id="sec-evaluations" class="section">
+    <div class="section-header">
+      <div class="text-xs text-text-muted mb-0.5">RAG Inmobiliaria</div>
+      <h1 class="text-lg font-bold text-text-main">Evaluaciones RAGAS <span class="badge badge-gold ml-2">BONUS</span></h1>
+    </div>
+    <div class="p-7 max-w-5xl mx-auto space-y-5">
+      <div class="callout">
+        <strong class="text-blue-300">Métricas RAGAS:</strong>
+        <ul class="mt-2 space-y-1 list-disc list-inside">
+          <li><strong>Faithfulness:</strong> ¿La respuesta es fiel al contexto recuperado? (0–1)</li>
+          <li><strong>Answer Relevancy:</strong> ¿La respuesta es relevante para la pregunta? (0–1)</li>
+          <li><strong>Context Recall:</strong> ¿El contexto recuperado cubre la respuesta correcta? (0–1)</li>
+        </ul>
+        <div class="mt-2 text-xs">Las evaluaciones actuales son <strong>proxy de similitud coseno</strong> (no evaluaciones RAGAS completas con LLM como juez). Para RAGAS completo: <code class="text-accent-cyan">pip install ragas</code>.</div>
+      </div>
+
+      <div id="evaluations-table"></div>
+
+      <!-- RAGAS code snippet -->
+      <div class="card p-5">
+        <div class="flex items-center justify-between mb-3">
+          <h3 class="text-sm font-semibold text-text-main">Implementación RAGAS Completa</h3>
+          <button onclick="copyRagasCode()" class="btn-secondary text-xs" id="btn-copy-ragas">
+            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            Copiar código
+          </button>
+        </div>
+        <pre id="ragas-code" class="bg-bg-base rounded-lg p-4 text-xs font-mono text-green-300 overflow-x-auto" style="border:1px solid var(--border)"><code>from ragas import evaluate
+from ragas.metrics import faithfulness, answer_relevancy, context_recall
+
+result = evaluate(
+    dataset=eval_dataset,  # HuggingFace Dataset con columnas:
+                           # question, answer, contexts, ground_truth
+    metrics=[
+        faithfulness,       # ¿respuesta fiel al contexto?
+        answer_relevancy,   # ¿respuesta relevante a la pregunta?
+        context_recall,     # ¿contexto cubre la respuesta correcta?
+    ]
+)
+
+print(result.to_pandas())</code></pre>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<!-- Toast container -->
+<div id="toast-container"></div>
+
+<script>
+const API = 'http://localhost:8000';
+
+const QUERIES = [
+  '¿Se permiten mascotas en el apartamento?',
+  '¿Cuál es el valor del arriendo mensual?',
+  '¿Qué incluye el contrato de arrendamiento?',
+  '¿Cuántas habitaciones tiene la propiedad?',
+  '¿Qué servicios públicos están incluidos?',
+];
+
+// ─── Navigation ───────────────────────────────────────────────────────────────
+function navigate(section, el) {
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('sec-'+section).classList.add('active');
+  el.classList.add('active');
+  if (section === 'images' && !window._imagesLoaded) loadImages();
+  if (section === 'evaluations') loadEvaluations();
+}
+
+// ─── Utils ────────────────────────────────────────────────────────────────────
+function adjustK(rangeId, valId, delta) {
+  const el = document.getElementById(rangeId);
+  el.value = Math.min(el.max, Math.max(el.min, +el.value + delta));
+  document.getElementById(valId).textContent = el.value;
+}
+
+function showToast(msg, type='info') {
+  const c = document.getElementById('toast-container');
+  const t = document.createElement('div');
+  t.className = `toast toast-${type}`;
+  t.textContent = msg;
+  c.appendChild(t);
+  requestAnimationFrame(() => { requestAnimationFrame(() => t.classList.add('show')); });
+  setTimeout(() => { t.classList.remove('show'); setTimeout(() => t.remove(), 350); }, 3000);
+}
+
+function showError(containerId, msg) {
+  const el = document.getElementById(containerId);
+  if (el) el.innerHTML = `<div class="flex items-start gap-3 p-4 rounded-lg border" style="background:rgba(239,68,68,0.08);border-color:rgba(239,68,68,0.25)"><span class="text-2xl">⚠️</span><div><div class="text-sm font-semibold text-red-400 mb-1">Error</div><div class="text-sm text-red-300">${escHtml(msg)}</div></div></div>`;
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function strategyBadge(s) {
+  const map = {fixed_size:'badge-fs',sentence:'badge-sn',semantic:'badge-sm'};
+  return `<span class="badge ${map[s]||'badge-tipo'}">${escHtml(s)}</span>`;
+}
+
+function scoreClass(v) {
+  if (v >= 0.75) return 'score-ex';
+  if (v >= 0.60) return 'score-good';
+  if (v >= 0.45) return 'score-mod';
+  return 'score-low';
+}
+
+function scoreBarFill(v) {
+  const pct = Math.round(v*100);
+  let color;
+  if (v >= 0.75) color = '#10b981';
+  else if (v >= 0.60) color = '#3b82f6';
+  else if (v >= 0.45) color = '#f59e0b';
+  else color = '#64748b';
+  return `<div class="score-bar-wrap" style="width:100%"><div class="score-bar-fill" style="width:${pct}%;background:${color}"></div></div>`;
+}
+
+function createChunkCard(chunk) {
+  const text = escHtml(chunk.texto || '');
+  const short = text.length > 300;
+  const id = 'cc-'+(Math.random().toString(36).slice(2));
+  return `<div class="chunk-card">
+    <div class="flex flex-wrap items-center gap-2 mb-2">
+      <span class="score-badge ${scoreClass(chunk.score)}">${chunk.score.toFixed(4)}</span>
+      ${strategyBadge(chunk.estrategia_chunking)}
+      ${chunk.tipo_doc ? `<span class="badge badge-tipo">${escHtml(chunk.tipo_doc)}</span>` : ''}
+    </div>
+    <div id="${id}" class="chunk-text">${short ? text.slice(0,300)+'…' : text}</div>
+    ${short ? `<span class="chunk-more" onclick="expandChunk('${id}',this,'${escHtml(text).replace(/'/g,"&#39;")}')">Ver más…</span>` : ''}
+    <div class="flex flex-wrap gap-3 mt-2 pt-2" style="border-top:1px solid var(--border)">
+      <span class="text-xs text-text-muted font-mono">${escHtml(chunk.doc_id||'')}</span>
+      <span class="text-xs text-text-muted font-mono">${escHtml(chunk.chunk_id||'')}</span>
+    </div>
+  </div>`;
+}
+
+function expandChunk(id, btn, fullText) {
+  const el = document.getElementById(id);
+  if (btn.textContent === 'Ver más…') {
+    el.innerHTML = fullText;
+    el.classList.add('expanded');
+    btn.textContent = 'Ver menos';
+  } else {
+    el.innerHTML = fullText.slice(0,300)+'…';
+    el.classList.remove('expanded');
+    btn.textContent = 'Ver más…';
+  }
+}
+
+function createSkeletonLoader(n, h='h-24') {
+  return Array(n).fill(`<div class="skeleton ${h} mb-3"></div>`).join('');
+}
+
+function setLoading(btnId, loading) {
+  const btn = document.getElementById(btnId);
+  if (!btn) return;
+  if (loading) {
+    btn._orig = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = `<span class="spinner"></span> Cargando...`;
+  } else {
+    btn.disabled = false;
+    btn.innerHTML = btn._orig || btn.innerHTML;
+  }
+}
+
+// ─── API Check ────────────────────────────────────────────────────────────────
+async function checkApi() {
+  try {
+    const r = await fetch(`${API}/`);
+    if (r.ok) {
+      document.getElementById('api-dot').className = 'pulse-dot pulse-online';
+      document.getElementById('api-text').textContent = 'API Conectada';
+      document.getElementById('offline-banner').style.display = 'none';
+      return true;
+    }
+  } catch(e) {}
+  document.getElementById('api-dot').className = 'pulse-dot pulse-offline';
+  document.getElementById('api-text').textContent = 'API Desconectada';
+  document.getElementById('offline-banner').style.display = 'block';
+  return false;
+}
+
+// ─── Dashboard ────────────────────────────────────────────────────────────────
+async function loadDashboard() {
+  try {
+    const r = await fetch(`${API}/stats`);
+    if (!r.ok) throw new Error('Error al cargar stats');
+    const d = await r.json();
+
+    const statDefs = [
+      {icon:'📄', label:'Documentos', val:d.documentos, sub:'en documents_repository', color:'accent-blue'},
+      {icon:'🧩', label:'Chunks Totales', val:d.chunks_total, sub:'vectorizados en MongoDB', color:'accent-cyan'},
+      {icon:'🏘️', label:'Propiedades', val:d.propiedades, sub:'en colección properties', color:'accent-gold'},
+      {icon:'🖼️', label:'Imágenes', val:d.media_assets, sub:'con embeddings CLIP 512d', color:'accent-green'},
+    ];
+
+    document.getElementById('stat-cards').innerHTML = statDefs.map(s=>`
+      <div class="card-stat relative overflow-hidden">
+        <div class="absolute right-3 top-3 text-3xl opacity-20">${s.icon}</div>
+        <div class="text-xs text-text-muted uppercase tracking-wider mb-1">${s.label}</div>
+        <div class="text-3xl font-extrabold text-${s.color} count-anim font-mono">${s.val}</div>
+        <div class="text-xs text-text-muted mt-1">${s.sub}</div>
+      </div>
+    `).join('');
+
+    const total = d.chunks_total || 1;
+    const strats = [
+      {key:'fixed_size',label:'fixed_size',badge:'badge-fs',desc:'Predecible y rápido. Ideal para contratos largos.'},
+      {key:'sentence',label:'sentence',badge:'badge-sn',desc:'Respeta oraciones. Ideal para chats y FAQs.'},
+      {key:'semantic',label:'semantic',badge:'badge-sm',desc:'Mayor cohesión temática. Mejor score en consultas.'},
+    ];
+    document.getElementById('chunk-strategy-cards').innerHTML = strats.map(s=>{
+      const count = d.chunks_por_estrategia[s.key]||0;
+      const pct = Math.round(count/total*100);
+      return `<div class="card p-4">
+        <div class="flex items-center justify-between mb-2">
+          <span class="badge ${s.badge}">${s.label}</span>
+          <span class="text-xl font-bold font-mono text-text-main">${count}</span>
+        </div>
+        <div class="score-bar-wrap my-2"><div class="score-bar-fill" style="width:${pct}%;background:var(--accent-blue)"></div></div>
+        <div class="text-xs text-text-muted">${pct}% del total — ${s.desc}</div>
+      </div>`;
+    }).join('');
+
+    document.getElementById('dash-eval-count').textContent = d.evaluaciones;
+    document.getElementById('dash-log-count').textContent = d.consultas_log;
+  } catch(e) {
+    document.getElementById('stat-cards').innerHTML = `<div class="col-span-4 text-text-muted text-sm p-4">No se pudieron cargar las estadísticas. Verifica que la API esté activa.</div>`;
+  }
+
+  // Build example queries
+  const container = document.getElementById('example-queries-dash');
+  container.innerHTML = QUERIES.map((q,i)=>`
+    <div class="card p-4 cursor-pointer hover:border-accent-blue transition-colors" onclick="goToRag('${q.replace(/'/g,"\\'")}')">
+      <div class="text-xs text-text-muted font-mono mb-1">#${i+1}</div>
+      <div class="text-sm text-text-main mb-2">${escHtml(q)}</div>
+      <div class="text-xs text-accent-blue flex items-center gap-1">→ Probar en RAG</div>
+    </div>
+  `).join('');
+}
+
+function goToRag(query) {
+  document.getElementById('rag-query').value = query;
+  const navItem = document.querySelector('[data-section="rag"]');
+  navigate('rag', navItem);
+  highlightRagBtn(query);
+}
+
+// ─── Búsqueda Semántica ───────────────────────────────────────────────────────
+async function doSearch() {
+  const query = document.getElementById('search-query').value.trim();
+  if (!query) { showToast('Ingresa una consulta primero','error'); return; }
+  const strategy = document.getElementById('search-strategy').value;
+  const tipo = document.getElementById('search-tipo').value;
+  const topK = +document.getElementById('search-k').value;
+  const res = document.getElementById('search-results');
+
+  setLoading('btn-search', true);
+  res.innerHTML = createSkeletonLoader(5);
+
+  try {
+    const t0 = Date.now();
+    const r = await fetch(`${API}/search`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({query, strategy:strategy||undefined, tipo_doc:tipo||undefined, top_k:topK}),
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.detail||'Error en búsqueda');
+    const elapsed = Date.now()-t0;
+
+    const chips = [];
+    if (strategy) chips.push(`<span class="badge badge-fs">${escHtml(strategy)}</span>`);
+    if (tipo) chips.push(`<span class="badge badge-tipo">${escHtml(tipo)}</span>`);
+
+    res.innerHTML = `
+      <div class="flex items-center justify-between flex-wrap gap-2 mb-3">
+        <div class="text-sm font-semibold text-text-main">${d.total_results} resultados</div>
+        <div class="flex items-center gap-2">
+          ${chips.join('')}
+          <span class="text-xs text-text-muted font-mono">${elapsed}ms</span>
+        </div>
+      </div>
+      <div class="space-y-3">${(d.chunks||[]).map(createChunkCard).join('')}</div>
+    `;
+  } catch(e) {
+    showError('search-results', e.message);
+  } finally {
+    setLoading('btn-search', false);
+  }
+}
+
+function clearSearch() {
+  document.getElementById('search-query').value='';
+  document.getElementById('search-strategy').value='';
+  document.getElementById('search-tipo').value='';
+  document.getElementById('search-k').value=5;
+  document.getElementById('search-k-val').textContent=5;
+  document.getElementById('search-results').innerHTML='';
+}
+
+// ─── RAG Pipeline ─────────────────────────────────────────────────────────────
+function buildRagQuickBtns() {
+  const c = document.getElementById('rag-quick-btns');
+  c.innerHTML = QUERIES.map(q=>`<button class="btn-query" onclick="fillRagQuery('${q.replace(/'/g,"\\'")}',this)">${escHtml(q)}</button>`).join('');
+}
+
+function fillRagQuery(q, btn) {
+  document.getElementById('rag-query').value = q;
+  document.querySelectorAll('#rag-quick-btns .btn-query').forEach(b=>b.classList.remove('selected'));
+  btn.classList.add('selected');
+}
+
+function highlightRagBtn(q) {
+  document.querySelectorAll('#rag-quick-btns .btn-query').forEach(b=>{
+    b.classList.toggle('selected', b.textContent===q);
+  });
+}
+
+async function doRag() {
+  const query = document.getElementById('rag-query').value.trim();
+  if (!query) { showToast('Ingresa una pregunta','error'); return; }
+  const strategy = document.getElementById('rag-strategy').value;
+  const topK = +document.getElementById('rag-k').value;
+
+  setLoading('btn-rag', true);
+  document.getElementById('rag-loading').classList.remove('hidden');
+  document.getElementById('rag-result').innerHTML = '';
+  const steps = ['rag-step-1','rag-step-2','rag-step-3'];
+  steps.forEach(s=>document.getElementById(s).className='progress-step waiting');
+  document.getElementById('rag-progress-bar').style.width='0%';
+
+  const activate = async (idx, delay=400) => {
+    await new Promise(r=>setTimeout(r,delay));
+    document.getElementById(steps[idx]).className='progress-step active';
+    document.getElementById('rag-progress-bar').style.width=`${(idx+1)*33}%`;
+    if (idx>0) document.getElementById(steps[idx-1]).className='progress-step done';
+  };
+  activate(0, 50);
+  activate(1, 500);
+
+  try {
+    const r = await fetch(`${API}/rag`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({query, strategy, top_k:topK}),
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.detail||'Error en RAG');
+
+    activate(2, 0);
+    await new Promise(r=>setTimeout(r,300));
+    steps.forEach(s=>document.getElementById(s).className='progress-step done');
+    document.getElementById('rag-progress-bar').style.width='100%';
+
+    await new Promise(r=>setTimeout(r,300));
+    document.getElementById('rag-loading').classList.add('hidden');
+
+    const chunksHtml = (d.chunks_usados||[]).map(c=>`
+      <div class="flex items-start gap-2 p-2 rounded bg-bg-base text-xs">
+        <span class="score-badge ${scoreClass(c.score)} flex-shrink-0">${c.score.toFixed(3)}</span>
+        <span class="text-text-muted line-clamp-2">${escHtml((c.texto||'').slice(0,120))}…</span>
+      </div>`).join('');
+
+    document.getElementById('rag-result').innerHTML = `
+      <div class="card overflow-hidden">
+        <div class="px-5 py-3 flex items-center gap-2" style="background:linear-gradient(90deg,rgba(59,130,246,0.15),rgba(6,182,212,0.08))">
+          <svg class="w-5 h-5 text-accent-blue flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v18m0 0h10a2 2 0 0 0 2-2v-4M9 21H5a2 2 0 0 1-2-2v-4m0 0h18"/></svg>
+          <span class="font-semibold text-text-main text-sm">Respuesta del Sistema RAG</span>
+        </div>
+        <div class="p-5">
+          <div class="text-[15px] leading-relaxed text-text-main mb-4" style="white-space:pre-wrap">${escHtml(d.respuesta)}</div>
+          <div class="flex flex-wrap gap-3 text-xs text-text-muted pt-3" style="border-top:1px solid var(--border)">
+            <span class="font-mono">⏱ ${d.tiempo_respuesta_ms}ms</span>
+            <span>${escHtml(d.modelo_llm)}</span>
+            ${strategyBadge(d.estrategia_chunking)}
+            <span class="font-mono text-text-muted">${escHtml(d.log_id)}</span>
+            <button onclick="copyText('${escHtml(d.respuesta).replace(/'/g,"&#39;")}')" class="ml-auto text-accent-blue hover:underline flex items-center gap-1">
+              <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+              Copiar
+            </button>
+          </div>
+        </div>
+      </div>
+      <details class="card mt-3">
+        <summary class="p-4 cursor-pointer text-sm font-semibold text-text-muted select-none hover:text-text-main">
+          Ver contexto utilizado (${(d.chunks_usados||[]).length} chunks)
+        </summary>
+        <div class="px-4 pb-4 space-y-2">${chunksHtml}</div>
+      </details>`;
+  } catch(e) {
+    document.getElementById('rag-loading').classList.add('hidden');
+    showError('rag-result', e.message);
+  } finally {
+    setLoading('btn-rag', false);
+  }
+}
+
+function copyText(t) {
+  navigator.clipboard.writeText(t).then(()=>showToast('Copiado al portapapeles','success'));
+}
+
+// ─── Images ───────────────────────────────────────────────────────────────────
+async function loadImages() {
+  const gallery = document.getElementById('img-gallery');
+  gallery.innerHTML = createSkeletonLoader(8,'h-44');
+  try {
+    const r = await fetch(`${API}/search/image/random?top_k=20`);
+    if (!r.ok) throw new Error('Error cargando imágenes');
+    const d = await r.json();
+    window._imagesLoaded = true;
+    window._imageData = d.resultados || [];
+
+    if (!window._imageData.length) {
+      gallery.innerHTML = '<div class="col-span-4 text-text-muted text-sm p-4 text-center">No se encontraron imágenes en la base de datos.</div>';
+      return;
+    }
+
+    gallery.innerHTML = window._imageData.map(img=>`
+      <div class="img-card" onclick="searchSimilar('${escHtml(img.media_id)}','${escHtml(img.url)}')">
+        <div class="img-placeholder relative overflow-hidden h-40">
+          <img src="${escHtml(img.url)}" alt="Propiedad ${escHtml(img.property_id)}"
+            class="w-full h-full object-cover"
+            onerror="this.parentNode.innerHTML='<div class=\\'img-placeholder h-40 flex flex-col items-center justify-center gap-2\\'><svg class=\\'w-12 h-12 opacity-30\\' viewBox=\\'0 0 24 24\\' fill=\\'none\\' stroke=\\'currentColor\\' stroke-width=\\'1.5\\'><rect x=\\'3\\' y=\\'3\\' width=\\'18\\' height=\\'18\\' rx=\\'2\\'/><circle cx=\\'9\\' cy=\\'9\\' r=\\'2\\'/><path d=\\'m21 15-3-3-5 5\\'/></svg><span class=\\'text-xs\\'>Sin imagen</span></div>'"/>
+        </div>
+        <div class="p-2">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-mono text-text-muted truncate">${escHtml(img.property_id)}</span>
+            <span class="badge badge-tipo text-xs">${escHtml(img.tipo||'img')}</span>
+          </div>
+          <button class="btn-primary w-full mt-2 text-xs py-1.5 justify-center">
+            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+            Buscar similares
+          </button>
+        </div>
+      </div>`).join('');
+  } catch(e) {
+    gallery.innerHTML = `<div class="col-span-4">${createSkeletonLoader(1,'h-20')}<div class="text-xs text-red-400 mt-2">${escHtml(e.message)}</div></div>`;
+  }
+}
+
+async function searchSimilar(mediaId, sourceUrl) {
+  document.getElementById('img-gallery-panel').classList.add('hidden');
+  const panel = document.getElementById('img-similar-panel');
+  panel.classList.remove('hidden');
+  document.getElementById('similar-source-id').textContent = mediaId;
+
+  // Breadcrumb
+  document.getElementById('img-breadcrumb').innerHTML = `
+    <span class="cursor-pointer hover:text-accent-blue" onclick="showGallery()">Galería</span>
+    <span class="text-text-muted">→</span>
+    <span class="text-text-main">Similares a <span class="font-mono text-accent-cyan text-xs">${escHtml(mediaId)}</span></span>`;
+
+  // Source image
+  document.getElementById('img-source-card').innerHTML = `
+    <div class="flex items-center gap-3 p-3 rounded-lg" style="background:rgba(59,130,246,0.08);border:1px solid rgba(59,130,246,0.25)">
+      <img src="${escHtml(sourceUrl)}" class="w-20 h-20 object-cover rounded-lg" onerror="this.src=''"/>
+      <div>
+        <div class="text-xs text-text-muted mb-1">Imagen fuente</div>
+        <div class="font-mono text-xs text-accent-cyan">${escHtml(mediaId)}</div>
+      </div>
+    </div>`;
+
+  const resultsEl = document.getElementById('img-similar-results');
+  resultsEl.innerHTML = createSkeletonLoader(6,'h-40');
+
+  try {
+    const r = await fetch(`${API}/search/image`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({media_id:mediaId, top_k:6}),
+    });
+    if (!r.ok) throw new Error('Error buscando similares');
+    const d = await r.json();
+    const imgs = d.resultados || [];
+    if (!imgs.length) { resultsEl.innerHTML = '<div class="col-span-3 text-text-muted text-sm p-4">No se encontraron imágenes similares.</div>'; return; }
+    resultsEl.innerHTML = imgs.map(img=>`
+      <div class="img-card">
+        <div class="relative h-36 overflow-hidden">
+          <img src="${escHtml(img.url)}" class="w-full h-full object-cover" onerror="this.parentNode.innerHTML='<div class=\\'img-placeholder h-36\\'></div>'"/>
+          <span class="absolute top-2 right-2 score-badge ${scoreClass(img.score)}">${img.score.toFixed(3)}</span>
+        </div>
+        <div class="p-2 text-xs font-mono text-text-muted truncate">${escHtml(img.property_id)}</div>
+      </div>`).join('');
+  } catch(e) {
+    resultsEl.innerHTML = `<div class="col-span-3 text-red-400 text-sm">${escHtml(e.message)}</div>`;
+  }
+}
+
+function showGallery() {
+  document.getElementById('img-similar-panel').classList.add('hidden');
+  document.getElementById('img-gallery-panel').classList.remove('hidden');
+  document.getElementById('img-breadcrumb').innerHTML = `<span class="text-text-main">Galería</span>`;
+}
+
+// ─── Compare Strategies ───────────────────────────────────────────────────────
+function buildCompareQuick() {
+  const c = document.getElementById('compare-quick');
+  c.innerHTML = QUERIES.map(q=>`<button class="btn-query" onclick="document.getElementById('compare-query').value='${q.replace(/'/g,"\\'")}';document.querySelectorAll('#compare-quick .btn-query').forEach(b=>b.classList.remove('selected'));this.classList.add('selected')">${escHtml(q)}</button>`).join('');
+}
+
+async function doCompare() {
+  const query = document.getElementById('compare-query').value.trim();
+  if (!query) { showToast('Ingresa una consulta','error'); return; }
+  const topK = document.getElementById('compare-k').value;
+  const res = document.getElementById('compare-results');
+
+  setLoading('btn-compare',true);
+  res.innerHTML = `<div class="grid grid-cols-1 md:grid-cols-3 gap-4 compare-grid">${createSkeletonLoader(3,'h-80').split('</div>').slice(0,3).map(s=>s+'</div>').join('')}</div>`;
+
+  try {
+    const r = await fetch(`${API}/chunks/compare?query=${encodeURIComponent(query)}&top_k=${topK}`);
+    if (!r.ok) throw new Error('Error en comparación');
+    const d = await r.json();
+
+    const best = d.estrategias.reduce((a,b)=>a.score_promedio>b.score_promedio?a:b);
+
+    const colHtml = d.estrategias.map(s=>`
+      <div class="card p-4">
+        <div class="flex items-center justify-between mb-3">
+          ${strategyBadge(s.estrategia)}
+          ${s.estrategia===best.estrategia ? '<span class="badge badge-gold">★ MEJOR</span>' : ''}
+        </div>
+        <div class="space-y-2 mb-3">
+          <div class="flex justify-between text-xs"><span class="text-text-muted">Total en DB</span><span class="font-mono">${s.total_chunks_en_db}</span></div>
+          <div class="flex justify-between text-xs"><span class="text-text-muted">Recuperados</span><span class="font-mono">${s.chunks_recuperados}</span></div>
+          <div class="flex justify-between text-xs"><span class="text-text-muted">Avg longitud</span><span class="font-mono">${s.longitud_promedio_chars.toFixed(0)} chars</span></div>
+          <div class="text-xs text-text-muted mb-1">Score promedio</div>
+          ${scoreBarFill(s.score_promedio)}
+          <div class="text-right font-mono text-sm font-bold text-text-main">${s.score_promedio.toFixed(4)}</div>
+        </div>
+        <div class="space-y-2 pt-2" style="border-top:1px solid var(--border)">
+          ${(s.chunks||[]).map(c=>`<div class="p-2 rounded text-xs bg-bg-base" style="border:1px solid var(--border)">
+            <span class="score-badge ${scoreClass(c.score)} mr-2">${c.score.toFixed(3)}</span>
+            <span class="text-text-muted">${escHtml((c.texto||'').slice(0,150))}…</span>
+          </div>`).join('')}
+        </div>
+      </div>`).join('');
+
+    // Analysis
+    const analysis = generateCompareAnalysis(d.estrategias, best);
+
+    // Footer table
+    const tHead = `<tr>${['Estrategia','Total DB','Recuperados','Avg Longitud','Score Promedio'].map(h=>`<th>${h}</th>`).join('')}</tr>`;
+    const tRows = d.estrategias.map(s=>`
+      <tr class="${s.estrategia===best.estrategia?'winner':''}">
+        <td>${strategyBadge(s.estrategia)}</td>
+        <td class="font-mono">${s.total_chunks_en_db}</td>
+        <td class="font-mono">${s.chunks_recuperados}</td>
+        <td class="font-mono">${s.longitud_promedio_chars.toFixed(0)}</td>
+        <td><div class="flex items-center gap-2">${scoreBarFill(s.score_promedio)}<span class="font-mono text-xs">${s.score_promedio.toFixed(4)}</span></div></td>
+      </tr>`).join('');
+
+    res.innerHTML = `
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4 compare-grid">${colHtml}</div>
+      <div class="card p-4 mt-4">
+        <div class="text-xs font-semibold text-text-muted uppercase tracking-wider mb-2">Tabla comparativa</div>
+        <div class="overflow-x-auto"><table class="data-table"><thead>${tHead}</thead><tbody>${tRows}</tbody></table></div>
+      </div>
+      <div class="callout mt-4">${analysis}</div>`;
+  } catch(e) {
+    showError('compare-results', e.message);
+  } finally {
+    setLoading('btn-compare',false);
+  }
+}
+
+function generateCompareAnalysis(estrategias, best) {
+  const map = {};
+  estrategias.forEach(s=>map[s.estrategia]=s);
+  return `<strong class="text-blue-300">Análisis Automático:</strong> Para la consulta ingresada, la estrategia
+    <strong>${best.estrategia}</strong> obtuvo el mayor score promedio
+    (<strong>${best.score_promedio.toFixed(4)}</strong>) con chunks de longitud promedio
+    <strong>${best.longitud_promedio_chars.toFixed(0)} caracteres</strong>.
+    ${best.estrategia==='semantic' ? 'El chunking semántico agrupa oraciones por similitud temática, logrando mayor cohesión conceptual y mejores scores de recuperación.' :
+      best.estrategia==='sentence' ? 'El chunking por oraciones preserva unidades lingüísticas completas, lo que favorece la recuperación de información conversacional y descriptiva.' :
+      'El chunking de tamaño fijo garantiza uniformidad y predecibilidad, siendo efectivo cuando los documentos tienen densidad informativa homogénea.'}`;
+}
+
+// ─── Experiment ───────────────────────────────────────────────────────────────
+let _expData = null;
+let _expSortDir = 1;
+
+async function doExperiment() {
+  const topK = document.getElementById('exp-k').value;
+  setLoading('btn-experiment',true);
+  document.getElementById('exp-loading').classList.remove('hidden');
+  document.getElementById('exp-results').innerHTML = '';
+
+  try {
+    const r = await fetch(`${API}/experiment/results?top_k=${topK}`);
+    if (!r.ok) throw new Error('Error ejecutando experimento');
+    const d = await r.json();
+    _expData = d;
+    document.getElementById('exp-loading').classList.add('hidden');
+    renderExperiment(d);
+  } catch(e) {
+    document.getElementById('exp-loading').classList.add('hidden');
+    showError('exp-results', e.message);
+  } finally {
+    setLoading('btn-experiment',false);
+  }
+}
+
+function renderExperiment(d) {
+  const resumen = d.resumen;
+  const strats = ['fixed_size','sentence','semantic'];
+  const bestStrat = strats.reduce((a,b)=>resumen[a].avg_score>resumen[b].avg_score?a:b);
+
+  // Part A: summary cards
+  const summaryHtml = strats.map(s=>{
+    const r = resumen[s];
+    const isBest = s===bestStrat;
+    return `<div class="card p-4 ${isBest?'border-accent-gold':''}" style="${isBest?'border-color:var(--accent-gold)':''}">
+      <div class="flex items-center justify-between mb-2">
+        ${strategyBadge(s)}
+        ${isBest ? '<span class="badge badge-gold">★ ÓPTIMA</span>' : ''}
+      </div>
+      <div class="text-3xl font-extrabold font-mono ${isBest?'text-accent-gold':'text-text-main'} mb-1">${r.avg_score.toFixed(4)}</div>
+      ${scoreBarFill(r.avg_score)}
+      <div class="mt-3 space-y-1 text-xs text-text-muted">
+        <div>Avg chunks: <span class="font-mono text-text-main">${r.avg_chunks_recuperados}</span></div>
+        <div>Avg longitud: <span class="font-mono text-text-main">${r.avg_longitud_chars.toFixed(0)} chars</span></div>
+      </div>
+    </div>`;
+  }).join('');
+
+  // Filter state
+  let activeStrats = new Set(['fixed_size','sentence','semantic']);
+
+  // Part B: table
+  const tableHtml = buildExpTable(d.resultados, activeStrats);
+
+  // Part C: analysis
+  const analysisHtml = buildExpAnalysis(resumen, bestStrat);
+
+  // Part D: heatmap
+  const heatmapHtml = buildHeatmap(d.resultados);
+
+  document.getElementById('exp-results').innerHTML = `
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">${summaryHtml}</div>
+
+    <div class="card p-5 mt-5">
+      <div class="flex flex-wrap items-center justify-between gap-3 mb-3">
+        <h3 class="text-sm font-semibold text-text-main">Tabla Comparativa (30 filas)</h3>
+        <div class="flex items-center gap-3 flex-wrap">
+          <div class="flex gap-2">
+            ${strats.map(s=>`<label class="flex items-center gap-1 text-xs cursor-pointer">
+              <input type="checkbox" checked data-strat="${s}" onchange="filterExpTable(this)" class="accent-blue-500"/> ${s}
+            </label>`).join('')}
+          </div>
+          <button onclick="exportExpCsv()" class="btn-secondary text-xs">
+            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+            Exportar CSV
+          </button>
+        </div>
+      </div>
+      <div class="overflow-x-auto" id="exp-table-wrap">${tableHtml}</div>
+    </div>
+
+    <div class="callout-green callout mt-5" id="exp-analysis">${analysisHtml}</div>
+
+    <div class="card p-5 mt-5">
+      <h3 class="text-sm font-semibold text-text-main mb-3">Mapa de Calor — Score por Consulta y Estrategia</h3>
+      <div class="overflow-x-auto">${heatmapHtml}</div>
+    </div>`;
+}
+
+function buildExpTable(rows, activeStrats) {
+  const filtered = rows.filter(r=>!activeStrats||activeStrats.has(r.estrategia));
+  const queries = [...new Set(rows.map(r=>r.consulta))];
+
+  const thead = `<thead><tr>
+    <th onclick="sortExpTable('consulta')">Consulta ↕</th>
+    <th onclick="sortExpTable('estrategia')">Estrategia ↕</th>
+    <th onclick="sortExpTable('chunks_recuperados')">Chunks ↕</th>
+    <th onclick="sortExpTable('longitud_promedio')">Avg Long ↕</th>
+    <th onclick="sortExpTable('score_promedio')">Score ↕</th>
+    <th>Preview</th>
+  </tr></thead>`;
+
+  // Find winner per query
+  const winnerMap = {};
+  queries.forEach(q=>{
+    const qRows = rows.filter(r=>r.consulta===q);
+    const winner = qRows.reduce((a,b)=>a.score_promedio>b.score_promedio?a:b);
+    winnerMap[`${q}|${winner.estrategia}`] = true;
+  });
+
+  const tbody = filtered.map((row,i)=>{
+    const isWinner = winnerMap[`${row.consulta}|${row.estrategia}`];
+    const isLast = i < filtered.length-1 && filtered[i+1]?.consulta !== row.consulta;
+    return `<tr class="${isWinner?'winner':''} ${isLast?'group-sep':''}">
+      <td class="text-xs max-w-xs">
+        <span title="${escHtml(row.consulta)}">${escHtml(row.consulta.slice(0,50))}${row.consulta.length>50?'…':''}</span>
+      </td>
+      <td>${strategyBadge(row.estrategia)}</td>
+      <td class="font-mono text-xs">${row.chunks_recuperados}</td>
+      <td class="font-mono text-xs">${row.longitud_promedio.toFixed(0)}</td>
+      <td>
+        <div class="flex items-center gap-2 min-w-[80px]">
+          ${scoreBarFill(row.score_promedio)}
+          <span class="font-mono text-xs whitespace-nowrap">${row.score_promedio.toFixed(4)}</span>
+        </div>
+      </td>
+      <td class="text-xs text-text-muted max-w-xs">
+        <span title="${escHtml(row.respuesta_preview)}">${escHtml((row.respuesta_preview||'').slice(0,80))}…</span>
+      </td>
+    </tr>`;
+  }).join('');
+
+  return `<table class="data-table" id="exp-table"><thead>${thead}</thead><tbody>${tbody}</tbody></table>`;
+}
+
+let _expSortKey = 'score_promedio';
+function sortExpTable(key) {
+  if (!_expData) return;
+  if (_expSortKey === key) _expSortDir *= -1;
+  else { _expSortKey = key; _expSortDir = -1; }
+  _expData.resultados.sort((a,b)=> {
+    if (a[key] < b[key]) return _expSortDir;
+    if (a[key] > b[key]) return -_expSortDir;
+    return 0;
+  });
+  document.getElementById('exp-table-wrap').innerHTML = buildExpTable(_expData.resultados, null);
+}
+
+function filterExpTable(cb) {
+  if (!_expData) return;
+  const checkboxes = document.querySelectorAll('[data-strat]');
+  const active = new Set([...(checkboxes)].filter(c=>c.checked).map(c=>c.dataset.strat));
+  document.getElementById('exp-table-wrap').innerHTML = buildExpTable(_expData.resultados, active);
+}
+
+function buildExpAnalysis(resumen, bestStrat) {
+  const strats = ['fixed_size','sentence','semantic'];
+  const lines = strats.map(s=>{
+    const r = resumen[s];
+    const descs = {
+      fixed_size:`Ventaja: predecible y uniforme. Desventaja: puede partir cláusulas contractuales, perdiendo contexto semántico.`,
+      sentence:`Ventaja: respeta unidades oracionales. Ideal para chats y descripciones. Desventaja: chunks de tamaño variable.`,
+      semantic:`Ventaja: mayor cohesión temática, mejores scores. Desventaja: más costoso computacionalmente.`,
+    };
+    return `<li class="mb-1"><strong class="text-text-main">${s}</strong>: avg score <span class="font-mono text-accent-blue">${r.avg_score.toFixed(4)}</span>, avg longitud <span class="font-mono">${r.avg_longitud_chars.toFixed(0)}</span> chars. ${descs[s]}</li>`;
+  }).join('');
+  const best = resumen[bestStrat];
+  return `<strong class="text-green-300 text-sm">📊 ANÁLISIS COMPARATIVO DE ESTRATEGIAS DE CHUNKING</strong>
+    <ul class="mt-2 space-y-1 text-xs list-none">${lines}</ul>
+    <div class="mt-2 text-xs"><strong>CONCLUSIÓN:</strong> Para el dominio inmobiliario colombiano, la estrategia
+    <strong>${bestStrat.toUpperCase()}</strong> es la más adecuada con un score promedio de
+    <strong>${best.avg_score.toFixed(4)}</strong>.
+    ${bestStrat==='semantic'?'La segmentación por similitud semántica preserva mejor el contexto temático de contratos, reglamentos y descripciones de propiedades.':
+      bestStrat==='sentence'?'Los límites oracionales capturan unidades informativas naturales del español inmobiliario.':
+      'La uniformidad del tamaño favorece la consistencia en la recuperación vectorial para este corpus.'}</div>`;
+}
+
+function buildHeatmap(rows) {
+  const queries = [...new Set(rows.map(r=>r.consulta))];
+  const strats = ['fixed_size','sentence','semantic'];
+
+  const heatColor = (v) => {
+    if (v >= 0.80) return '#064e3b';
+    if (v >= 0.70) return '#065f46';
+    if (v >= 0.60) return '#047857';
+    if (v >= 0.50) return '#f59e0b';
+    if (v >= 0.40) return '#d97706';
+    return '#92400e';
+  };
+
+  const header = `<tr><th style="text-align:left;padding:6px 10px;font-size:11px;color:var(--text-muted)">Consulta</th>${strats.map(s=>`<th style="padding:6px 10px;font-size:11px;color:var(--text-muted)">${s}</th>`).join('')}</tr>`;
+  const bodyRows = queries.map(q=>{
+    const cells = strats.map(s=>{
+      const row = rows.find(r=>r.consulta===q&&r.estrategia===s);
+      const v = row ? row.score_promedio : 0;
+      return `<td class="heat-cell" style="background:${heatColor(v)};color:#fff">${v.toFixed(3)}</td>`;
+    }).join('');
+    return `<tr><td style="padding:6px 10px;font-size:11px;color:var(--text-muted);max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${escHtml(q)}">${escHtml(q.slice(0,40))}…</td>${cells}</tr>`;
+  }).join('');
+
+  return `<table style="border-collapse:collapse;width:100%"><thead>${header}</thead><tbody>${bodyRows}</tbody></table>
+    <div class="flex items-center gap-4 mt-2 text-xs text-text-muted">
+      <span>Escala:</span>
+      ${['≥0.80','≥0.70','≥0.60','≥0.50','<0.50'].map((l,i)=>{
+        const colors=['#064e3b','#065f46','#047857','#f59e0b','#92400e'];
+        return `<span class="flex items-center gap-1"><span style="display:inline-block;width:12px;height:12px;background:${colors[i]};border-radius:2px"></span>${l}</span>`;
+      }).join('')}
+    </div>`;
+}
+
+function exportExpCsv() {
+  if (!_expData) return;
+  const rows = _expData.resultados;
+  const header = 'consulta,estrategia,chunks_recuperados,longitud_promedio,score_promedio\n';
+  const body = rows.map(r=>`"${r.consulta}",${r.estrategia},${r.chunks_recuperados},${r.longitud_promedio.toFixed(1)},${r.score_promedio.toFixed(4)}`).join('\n');
+  const blob = new Blob([header+body], {type:'text/csv;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href=url; a.download='experimento_chunking.csv'; a.click();
+  URL.revokeObjectURL(url);
+  showToast('CSV exportado','success');
+}
+
+// ─── Evaluations ─────────────────────────────────────────────────────────────
+async function loadEvaluations() {
+  const el = document.getElementById('evaluations-table');
+  el.innerHTML = createSkeletonLoader(5,'h-10');
+  try {
+    const r = await fetch(`${API}/evaluations?limit=30`);
+    if (!r.ok) throw new Error('Error cargando evaluaciones');
+    const d = await r.json();
+    const evals = d.evaluaciones || [];
+    if (!evals.length) {
+      el.innerHTML = `<div class="callout">No hay evaluaciones guardadas aún. Ejecuta el experimento primero.</div>`;
+      return;
+    }
+    const thead = `<tr><th>ID</th><th>Query ID</th><th>Relevancia</th><th>Precisión</th><th>Faithfulness</th><th>Ans. Relevancy</th><th>Context Recall</th><th>Modelo</th><th>Fecha</th></tr>`;
+    const tbody = evals.map(e=>`<tr>
+      <td class="font-mono text-xs text-text-muted">${escHtml((e._id||'').slice(-8))}</td>
+      <td class="font-mono text-xs">${escHtml((e.rag_query_id||'').slice(-12))}</td>
+      <td><div class="flex items-center gap-2">${scoreBarFill(e.relevancia||0)}<span class="font-mono text-xs">${(e.relevancia||0).toFixed(3)}</span></div></td>
+      <td><div class="flex items-center gap-2">${scoreBarFill(e.precision||0)}<span class="font-mono text-xs">${(e.precision||0).toFixed(3)}</span></div></td>
+      <td class="text-text-muted text-xs">${e.faithfulness!=null?(e.faithfulness).toFixed(3):'—'}</td>
+      <td class="text-text-muted text-xs">${e.answer_relevancy!=null?(e.answer_relevancy).toFixed(3):'—'}</td>
+      <td class="text-text-muted text-xs">${e.context_recall!=null?(e.context_recall).toFixed(3):'—'}</td>
+      <td class="text-xs">${escHtml(e.modelo_eval||'')}</td>
+      <td class="text-xs text-text-muted">${e.fecha ? new Date(e.fecha).toLocaleDateString('es-CO') : '—'}</td>
+    </tr>`).join('');
+    el.innerHTML = `<div class="overflow-x-auto"><table class="data-table"><thead>${thead}</thead><tbody>${tbody}</tbody></table></div>
+      <div class="text-xs text-text-muted mt-2">${evals.length} evaluaciones cargadas · Las columnas Faithfulness, Answer Relevancy y Context Recall requieren evaluación RAGAS completa con LLM como juez.</div>`;
+  } catch(e) {
+    showError('evaluations-table', e.message);
+  }
+}
+
+function copyRagasCode() {
+  const code = document.getElementById('ragas-code').textContent;
+  navigator.clipboard.writeText(code).then(()=>{
+    showToast('Código copiado','success');
+    document.getElementById('btn-copy-ragas').innerHTML = '✓ Copiado';
+    setTimeout(()=>document.getElementById('btn-copy-ragas').innerHTML = `<svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copiar código`, 2000);
+  });
+}
+
+// ─── Init ─────────────────────────────────────────────────────────────────────
+(async function init() {
+  buildRagQuickBtns();
+  buildCompareQuick();
+  await checkApi();
+  loadDashboard();
+  setInterval(checkApi, 30000);
+})();
+</script>
+</body>
+</html>

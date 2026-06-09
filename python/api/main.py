@@ -20,6 +20,7 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import FastAPI, HTTPException, Query
+from fastapi.middleware.cors import CORSMiddleware
 from groq import Groq
 
 sys.path.insert(0, ".")
@@ -62,6 +63,13 @@ app = FastAPI(
     ),
     version="2.0.0",
     lifespan=lifespan,
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 CONSULTAS_EXPERIMENTO = [
@@ -410,3 +418,86 @@ def experiment_results(top_k: int = Query(3, ge=1, le=10)):
         resultados=rows,
         resumen=resumen,
     )
+
+
+# ---------------------------------------------------------------------------
+# Nuevos endpoints: /stats  /images  /search/images  /evaluations
+# ---------------------------------------------------------------------------
+
+@app.get("/stats", summary="Estadísticas del sistema")
+def get_stats():
+    """Retorna conteos de las colecciones principales de MongoDB."""
+    db = get_db()
+    chunks_by_strategy = {
+        s: db["document_chunks"].count_documents({"estrategia_chunking": s})
+        for s in ["fixed_size", "sentence", "semantic"]
+    }
+    return {
+        "documentos": db["documents_repository"].count_documents({}),
+        "chunks_total": db["document_chunks"].count_documents({}),
+        "chunks_por_estrategia": chunks_by_strategy,
+        "media_assets": db["media_assets"].count_documents({}),
+        "propiedades": db["properties"].count_documents({}),
+        "contratos": db["contracts"].count_documents({}),
+        "consultas_log": db["rag_queries_logs"].count_documents({}),
+        "evaluaciones": db["rag_evaluations"].count_documents({}),
+    }
+
+
+@app.get("/images", summary="Lista de imágenes del catálogo")
+def list_images(limit: int = Query(20, ge=1, le=60)):
+    """Retorna imágenes del catálogo con sus URLs y metadatos."""
+    db = get_db()
+    docs = list(
+        db["media_assets"].find(
+            {}, {"_id": 1, "url": 1, "property_id": 1, "tipo": 1}
+        ).limit(limit)
+    )
+    for d in docs:
+        d["_id"] = str(d["_id"])
+    return {"images": docs, "total": len(docs)}
+
+
+@app.post("/search/images", summary="Búsqueda de imágenes similares por media_id")
+def search_similar_images(req: ImageSearchRequest):
+    """Busca imágenes visualmente similares usando Atlas Vector Search."""
+    db = get_db()
+    raw = vector_search_images(db, media_id=req.media_id, top_k=req.top_k)
+    if not raw:
+        raise HTTPException(404, "media_id no encontrado o sin resultados")
+    resultados = images_to_models(raw)
+    return {
+        "source_media_id": req.media_id,
+        "results": [
+            {
+                "media_id": r.media_id,
+                "url": r.url,
+                "property_id": r.property_id,
+                "score": r.score,
+            }
+            for r in resultados
+        ],
+    }
+
+
+@app.get("/evaluations", summary="Últimas evaluaciones guardadas")
+def get_evaluations(limit: int = Query(20, ge=1, le=100)):
+    """Retorna las últimas evaluaciones de la colección rag_evaluations."""
+    db = get_db()
+    docs = list(
+        db["rag_evaluations"].find(
+            {},
+            {
+                "_id": 1,
+                "rag_query_id": 1,
+                "relevancia": 1,
+                "precision": 1,
+                "modelo_eval": 1,
+                "fecha": 1,
+                "_meta": 1,
+            },
+        ).sort("fecha", -1).limit(limit)
+    )
+    for d in docs:
+        d["_id"] = str(d["_id"])
+    return {"evaluaciones": docs, "total": len(docs)}
