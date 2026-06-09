@@ -25,13 +25,14 @@ from groq import Groq
 sys.path.insert(0, ".")
 from config import settings
 from database import get_db
-from chunking_pipeline import embed, vector_search
+from chunking_pipeline import embed, vector_search, vector_search_images
 
 from api.models import (
     SearchRequest, SearchResponse, ChunkResult,
     RAGRequest, RAGResponse,
     CompareRequest, CompareResponse, StrategyStats,
     ExperimentResponse, ExperimentRow,
+    ImageSearchRequest, ImageSearchResponse, ImageResult, ImageRandomResponse,
 )
 
 
@@ -194,6 +195,54 @@ def search(req: SearchRequest):
         strategy=req.strategy,
         total_results=len(chunks),
         chunks=chunks,
+    )
+
+
+# ── Endpoints de imágenes ───────────────────────────────────────────────────
+
+
+def images_to_models(raw: list) -> list[ImageResult]:
+    return [
+        ImageResult(
+            image_embedding_id=c["_id"],
+            media_id=c["media_id"],
+            url=c["url"],
+            tipo=c["tipo"],
+            property_id=c["property_id"],
+            score=round(c.get("score", 1.0), 4),
+        )
+        for c in raw
+    ]
+
+
+@app.post("/search/image", response_model=ImageSearchResponse, summary="Buscar imágenes similares por media_id")
+def search_image(req: ImageSearchRequest):
+    """
+    Busca imágenes visualmente similares a una imagen de referencia.
+    Usa $vectorSearch contra el índice vector_index_images (512 dimensiones CLIP).
+    """
+    db = get_db()
+    raw = vector_search_images(db, media_id=req.media_id, top_k=req.top_k)
+    resultados = images_to_models(raw)
+    return ImageSearchResponse(
+        media_id_referencia=req.media_id,
+        total_results=len(resultados),
+        resultados=resultados,
+    )
+
+
+@app.get("/search/image/random", response_model=ImageRandomResponse, summary="Imágenes aleatorias (muestra)")
+def random_images(top_k: int = Query(5, ge=1, le=20)):
+    """
+    Retorna una muestra aleatoria de imágenes con sus metadatos.
+    Útil para explorar el catálogo visual antes de hacer búsquedas por similitud.
+    """
+    db = get_db()
+    raw = vector_search_images(db, media_id=None, top_k=top_k)
+    resultados = images_to_models(raw)
+    return ImageRandomResponse(
+        total_results=len(resultados),
+        resultados=resultados,
     )
 
 

@@ -307,6 +307,91 @@ def vector_search(
     return list(db["document_chunks"].aggregate(pipeline))
 
 
+def vector_search_images(
+    db,
+    media_id: str | None = None,
+    top_k: int = 5,
+) -> List[dict]:
+    """
+    Búsqueda vectorial por similitud de imágenes usando Atlas Vector Search.
+
+    Requiere el índice 'vector_index_images' creado en Atlas UI sobre la
+    colección image_embeddings.
+
+    Si se proporciona un media_id, busca imágenes visualmente similares a esa
+    imagen de referencia (usando su embedding). Si no, retorna las imágenes
+    con mayor score (top_k globales).
+    """
+    if not media_id:
+        return list(
+            db["image_embeddings"].aggregate([
+                {"$sample": {"size": top_k}},
+                {
+                    "$lookup": {
+                        "from": "media_assets",
+                        "localField": "media_id",
+                        "foreignField": "_id",
+                        "as": "media_info",
+                    }
+                },
+                {"$unwind": {"path": "$media_info", "preserveNullAndEmptyArrays": False}},
+                {
+                    "$project": {
+                        "_id": 1,
+                        "media_id": 1,
+                        "modelo": 1,
+                        "url": "$media_info.url",
+                        "tipo": "$media_info.tipo",
+                        "property_id": "$media_info.property_id",
+                        "score": 1,
+                    }
+                },
+            ])
+        )
+
+    # Buscar el embedding de la imagen de referencia
+    ref = db["image_embeddings"].find_one({"media_id": media_id})
+    if not ref:
+        return []
+
+    query_vec = ref["embedding"]
+
+    pipeline: list[dict] = [
+        {
+            "$vectorSearch": {
+                "index": "vector_index_images",
+                "path": "embedding",
+                "queryVector": query_vec,
+                "numCandidates": 100,
+                "limit": top_k,
+                "filter": {"media_id": {"$ne": media_id}},
+            }
+        },
+        {
+            "$lookup": {
+                "from": "media_assets",
+                "localField": "media_id",
+                "foreignField": "_id",
+                "as": "media_info",
+            }
+        },
+        {"$unwind": {"path": "$media_info", "preserveNullAndEmptyArrays": False}},
+        {
+            "$project": {
+                "_id": 1,
+                "media_id": 1,
+                "modelo": 1,
+                "url": "$media_info.url",
+                "tipo": "$media_info.tipo",
+                "property_id": "$media_info.property_id",
+                "score": {"$meta": "vectorSearchScore"},
+            }
+        },
+    ]
+
+    return list(db["image_embeddings"].aggregate(pipeline))
+
+
 # ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------

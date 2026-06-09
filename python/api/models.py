@@ -90,3 +90,34 @@ class ExperimentResponse(BaseModel):
     total_ejecuciones: int
     resultados: List[ExperimentRow]
     resumen: dict
+
+
+# ── Imágenes ────────────────────────────────────────────────────────────────
+
+class ImageSearchRequest(BaseModel):
+    media_id: str = Field(
+        ...,
+        min_length=1,
+        description="ID del media_asset de referencia para buscar imágenes similares",
+    )
+    top_k: int = Field(5, ge=1, le=20, description="Número de imágenes similares a retornar")
+
+
+class ImageResult(BaseModel):
+    image_embedding_id: str
+    media_id: str
+    url: str
+    tipo: str
+    property_id: str
+    score: float
+
+
+class ImageSearchResponse(BaseModel):
+    media_id_referencia: str
+    total_results: int
+    resultados: List[ImageResult]
+
+
+class ImageRandomResponse(BaseModel):
+    total_results: int
+    resultados: List[ImageResult]
