@@ -22,6 +22,8 @@ from typing import Optional
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from groq import Groq
+import numpy as np
+from sklearn.metrics.pairwise import cosine_similarity
 
 sys.path.insert(0, ".")
 from config import settings
@@ -39,19 +41,42 @@ from api.models import (
 
 
 # ---------------------------------------------------------------------------
-# Lifespan: carga el modelo de embeddings al arrancar
+# Lifespan: carga los modelos de embeddings al arrancar
 # ---------------------------------------------------------------------------
+
+_clip_processor = None
+_clip_model = None
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # **lifespan**: se ejecuta al iniciar y detener la aplicacion FastAPI
-    # Al arrancar, precarga el modelo de embeddings en memoria para que
-    # las primeras consultas no tengan demora por carga del modelo
-    print("Precargando modelo de embeddings...")
+    # Al arrancar, precarga los modelos de embeddings en memoria
+    global _clip_processor, _clip_model
+    print("Precargando modelos de embeddings...")
+
+    # Cargar MiniLM para texto
     from chunking_pipeline import get_model
     get_model()
-    print("Modelo listo.")
+    print("  MiniLM listo.")
+
+    # Cargar CLIP para busqueda texto a imagen
+    print("  Cargando CLIP (openai/clip-vit-base-patch32)...")
+    from transformers import CLIPProcessor, CLIPModel
+    _clip_processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
+    _clip_model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32")
+    print("  CLIP listo.")
+
+    print("Modelos listos.")
     yield
+
+
+def embed_text_clip(text: str) -> list:
+    # **clip_text_embedding**: genera embedding de texto usando CLIP (512 dims)
+    # para buscar imagenes por descripcion textual en el mismo espacio vectorial
+    global _clip_processor, _clip_model
+    inputs = _clip_processor(text=[text], return_tensors="pt", padding=True)
+    outputs = _clip_model.get_text_features(**inputs)
+    return outputs.detach().numpy().flatten().tolist()
 
 
 # ---------------------------------------------------------------------------
@@ -480,21 +505,14 @@ def experiment_results(top_k: int = Query(3, ge=1, le=10)):
 def search_text_to_image(req: TextToImageRequest):
     """
     Busca imagenes visualmente similares a partir de una descripcion textual.
-
-    1. Genera embedding de texto (384d) con all-MiniLM-L6-v2
-    2. Proyecta a 512d con padding de ceros (compatible con CLIP embeddings)
-    3. Busca en image_embeddings usando $vectorSearch con indice vector_index_images
-    4. Si falla, hace busqueda manual por similitud coseno sobre los primeros 384d
+    Usa CLIP (openai/clip-vit-base-patch32) para codificar el texto en el mismo
+    espacio vectorial que las imagenes (512 dimensiones).
     """
-    # **endpoint_text_to_image**: convierte texto descriptivo a embedding de 384d,
-    # lo completa con ceros a 512d para compatibilidad con CLIP, y busca en el
-    # indice vector_index_images. Si el indice Atlas falla, usa fallback manual
-    # con sklearn cosine_similarity
+    # **endpoint_text_to_image**: convierte texto a embedding usando CLIP (512d)
+    # y busca en el indice vector_index_images. Si el indice falla, usa
+    # busqueda manual con cosine similarity
     db = get_db()
-    query_vec_384 = embed([req.query])[0]
-
-    # Padding a 512 dimensiones para compatibilidad con CLIP
-    query_vec_512 = query_vec_384 + [0.0] * (512 - len(query_vec_384))
+    query_vec_512 = embed_text_clip(req.query)
 
     try:
         pipeline = [
@@ -529,12 +547,8 @@ def search_text_to_image(req: TextToImageRequest):
         ]
         raw = list(db["image_embeddings"].aggregate(pipeline))
     except Exception:
-        # Fallback manual por similitud coseno con 384d
-        # **fallback**: si el indice Atlas no existe o falla, se hace busqueda
-        # manual comparando el embedding de texto contra todas las imagenes
-        # usando similitud coseno en las primeras 384 dimensiones
-        import numpy as np
-        from sklearn.metrics.pairwise import cosine_similarity
+        # Fallback manual por similitud coseno
+        # **fallback**: si el indice Atlas no existe, compara contra todas
 
         all_embeddings = list(db["image_embeddings"].aggregate([
             {
@@ -558,13 +572,13 @@ def search_text_to_image(req: TextToImageRequest):
             },
         ]))
 
-        q = np.array(query_vec_384).reshape(1, -1)
+        q = np.array(query_vec_512).reshape(1, -1)
         scored = []
         for doc in all_embeddings:
             emb = doc.get("embedding", [])
             if not emb:
                 continue
-            v = np.array(emb[:384]).reshape(1, -1)
+            v = np.array(emb[:512]).reshape(1, -1)
             sim = float(cosine_similarity(q, v)[0][0])
             scored.append({
                 "_id": doc["_id"],
