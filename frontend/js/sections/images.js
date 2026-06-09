@@ -1,0 +1,206 @@
+/* ─── Imágenes: Galería, Búsqueda imagen→imagen, texto→imagen ──────────── */
+
+// ─── Helper: placeholder elegante ─────────────────────────────────────────
+
+function buildImgPlaceholder(propertyId, tipo, height) {
+  height = height || 'h-40';
+  var phClass = imgPlaceholderClass(propertyId);
+  var tipoLabel = escHtml(tipo || 'Imagen');
+  return '<div class="' + phClass + ' ' + height + ' flex flex-col items-center justify-center gap-1 p-3 text-center">' +
+    buildingIcon(48) +
+    '<span class="text-xs font-mono font-bold text-white/50">' + escHtml(propertyId || '—') + '</span>' +
+    '<span class="badge badge-tipo" style="font-size:10px">' + tipoLabel + '</span>' +
+  '</div>';
+}
+
+function buildImgCard(img, onClickAttr) {
+  onClickAttr = onClickAttr || '';
+  var phClass = imgPlaceholderClass(img.property_id);
+  var tipoLabel = escHtml(img.tipo || 'Imagen');
+  return '<div class="img-card"' + onClickAttr + '>' +
+    '<div class="' + phClass + ' h-40 flex flex-col items-center justify-center gap-1 p-3 text-center">' +
+      buildingIcon(48) +
+      '<span class="text-xs font-mono font-bold text-white/50">' + escHtml(img.property_id) + '</span>' +
+      '<span class="badge badge-tipo" style="font-size:10px">' + tipoLabel + '</span>' +
+    '</div>' +
+    '<div class="p-2">' +
+      '<div class="flex items-center justify-between">' +
+        '<span class="text-xs font-mono text-text-muted truncate">' + escHtml(img.property_id) + '</span>' +
+        '<span class="badge badge-tipo text-xs">' + tipoLabel + '</span>' +
+      '</div>' +
+      '<button class="btn-primary w-full mt-2 text-xs py-1.5 justify-center">' +
+        '<svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>' +
+        ' Buscar similares' +
+      '</button>' +
+    '</div>' +
+  '</div>';
+}
+
+// ─── Cargar galería ───────────────────────────────────────────────────────
+
+async function loadImages() {
+  var gallery = document.getElementById('img-gallery');
+  gallery.innerHTML = createSkeletonLoader(8,'h-44');
+  try {
+    var r = await fetch(API + '/search/image/random?top_k=20');
+    if (!r.ok) throw new Error('Error cargando imágenes');
+    var d = await r.json();
+    window._imagesLoaded = true;
+    window._imageData = d.resultados || [];
+
+    if (!window._imageData.length) {
+      gallery.innerHTML = '<div class="col-span-4 text-text-muted text-sm p-4 text-center">No se encontraron imágenes en la base de datos.</div>';
+      return;
+    }
+
+    gallery.innerHTML = window._imageData.map(function (img) {
+      return buildImgCard(img, ' onclick="searchSimilar(\'' + escHtml(img.media_id) + '\',\'' + escHtml(img.url) + '\')"');
+    }).join('');
+  } catch(e) {
+    gallery.innerHTML = '<div class="col-span-4">' + createSkeletonLoader(1,'h-20') + '<div class="text-xs text-red-400 mt-2">' + escHtml(e.message) + '</div></div>';
+  }
+}
+
+// ─── Búsqueda imagen→imagen ──────────────────────────────────────────────
+
+async function searchSimilar(mediaId, sourceUrl) {
+  document.getElementById('img-gallery-panel').classList.add('hidden');
+  document.getElementById('img-tab-panel-t2i').classList.remove('active');
+  var panel = document.getElementById('img-similar-panel');
+  panel.classList.remove('hidden');
+  document.getElementById('similar-source-id').textContent = mediaId;
+
+  document.getElementById('img-breadcrumb').innerHTML =
+    '<span class="cursor-pointer hover:text-accent-blue" onclick="showGallery()">Galería</span>' +
+    '<span class="text-text-muted">→</span>' +
+    '<span class="text-text-main">Similares a <span class="font-mono text-accent-cyan text-xs">' + escHtml(mediaId) + '</span></span>';
+
+  // Source image — placeholder elegante, nunca <img>
+  var phClass = imgPlaceholderClass(mediaId);
+  document.getElementById('img-source-card').innerHTML =
+    '<div class="flex items-center gap-3 p-3 rounded-lg" style="background:rgba(59,130,246,0.08);border:1px solid rgba(59,130,246,0.25)">' +
+      '<div class="w-20 h-20 rounded-lg ' + phClass + ' flex flex-col items-center justify-center gap-0.5 text-center" style="flex-shrink:0">' +
+        buildingIcon(28) +
+        '<span class="text-[9px] font-mono text-white/50 truncate max-w-[70px]">' + escHtml(mediaId) + '</span>' +
+      '</div>' +
+      '<div>' +
+        '<div class="text-xs text-text-muted mb-1">Imagen fuente</div>' +
+        '<div class="font-mono text-xs text-accent-cyan">' + escHtml(mediaId) + '</div>' +
+      '</div>' +
+    '</div>';
+
+  var resultsEl = document.getElementById('img-similar-results');
+  resultsEl.innerHTML = createSkeletonLoader(6,'h-40');
+
+  try {
+    var r = await fetch(API + '/search/image', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({media_id:mediaId, top_k:6}),
+    });
+    if (!r.ok) throw new Error('Error buscando similares');
+    var d = await r.json();
+    var imgs = d.resultados || [];
+    if (!imgs.length) {
+      resultsEl.innerHTML = '<div class="col-span-3 text-text-muted text-sm p-4">No se encontraron imágenes similares.</div>';
+      return;
+    }
+    resultsEl.innerHTML = imgs.map(function (img) {
+      var ph = imgPlaceholderClass(img.property_id);
+      return '<div class="img-card">' +
+        '<div class="relative h-36">' +
+          '<div class="' + ph + ' h-full flex flex-col items-center justify-center gap-1 p-2 text-center">' +
+            buildingIcon(36) +
+            '<span class="text-[10px] font-mono font-bold text-white/50">' + escHtml(img.property_id) + '</span>' +
+          '</div>' +
+          '<span class="absolute top-2 right-2 score-badge ' + scoreClass(img.score) + '">' + img.score.toFixed(3) + '</span>' +
+        '</div>' +
+        '<div class="p-2 text-xs font-mono text-text-muted truncate">' + escHtml(img.property_id) + '</div>' +
+      '</div>';
+    }).join('');
+  } catch(e) {
+    resultsEl.innerHTML = '<div class="col-span-3 text-red-400 text-sm">' + escHtml(e.message) + '</div>';
+  }
+}
+
+function showGallery() {
+  document.getElementById('img-similar-panel').classList.add('hidden');
+  document.getElementById('img-gallery-panel').classList.remove('hidden');
+  document.getElementById('img-breadcrumb').innerHTML = '<span class="text-text-main">Galería</span>';
+  // Switch tab back to gallery
+  switchImgTab('gallery');
+}
+
+// ─── Tabs: Galería ↔ Búsqueda por descripción ─────────────────────────────
+
+function switchImgTab(tab) {
+  document.querySelectorAll('.img-tab').forEach(function (t) { t.classList.remove('active'); });
+  document.querySelectorAll('.img-tab-panel').forEach(function (p) { p.classList.remove('active'); });
+  var tabEl = document.querySelector('.img-tab[data-tab="' + tab + '"]');
+  if (tabEl) tabEl.classList.add('active');
+  var panel = document.getElementById('img-tab-panel-' + tab);
+  if (panel) panel.classList.add('active');
+}
+
+// ─── Búsqueda texto→imagen ────────────────────────────────────────────────
+
+var T2I_EXAMPLES = [
+  'Apartamento moderno',
+  'Sala amplia',
+  'Vista exterior fachada',
+  'Habitación principal',
+];
+
+function fillT2iQuery(q, btn) {
+  document.getElementById('t2i-query').value = q;
+  document.querySelectorAll('#t2i-examples .btn-query').forEach(function (b) { b.classList.remove('selected'); });
+  if (btn) btn.classList.add('selected');
+}
+
+async function doTextToImage() {
+  var query = document.getElementById('t2i-query').value.trim();
+  if (!query) { showToast('Describe la propiedad que buscas','error'); return; }
+  var resultsEl = document.getElementById('t2i-results');
+  setLoading('btn-t2i', true);
+  resultsEl.innerHTML = createSkeletonLoader(5,'h-44');
+
+  try {
+    var r = await fetch(API + '/search/text-to-image', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({query:query, top_k:5}),
+    });
+    if (!r.ok) throw new Error('Error en búsqueda texto→imagen');
+    var d = await r.json();
+    var imgs = d.resultados || [];
+
+    if (!imgs.length) {
+      resultsEl.innerHTML = '<div class="col-span-4 text-text-muted text-sm p-4 text-center">No se encontraron imágenes para esta descripción.</div>';
+      return;
+    }
+
+    resultsEl.innerHTML = imgs.map(function (img) {
+      var ph = imgPlaceholderClass(img.property_id);
+      return '<div class="img-card" onclick="searchSimilar(\'' + escHtml(img.media_id) + '\',\'' + escHtml(img.url) + '\')">' +
+        '<div class="relative h-40">' +
+          '<div class="' + ph + ' h-full flex flex-col items-center justify-center gap-1 p-2 text-center">' +
+            buildingIcon(48) +
+            '<span class="text-xs font-mono font-bold text-white/50">' + escHtml(img.property_id) + '</span>' +
+          '</div>' +
+          '<span class="absolute top-2 right-2 score-badge ' + scoreClass(img.score) + '">' + img.score.toFixed(3) + '</span>' +
+        '</div>' +
+        '<div class="p-2">' +
+          '<div class="flex items-center justify-between">' +
+            '<span class="text-xs font-mono text-text-muted truncate">' + escHtml(img.property_id) + '</span>' +
+            '<span class="badge badge-tipo text-xs">' + escHtml(img.tipo||'') + '</span>' +
+          '</div>' +
+          '<div class="text-[10px] text-text-muted mt-1 font-mono">Score: ' + img.score.toFixed(4) + '</div>' +
+        '</div>' +
+      '</div>';
+    }).join('');
+  } catch(e) {
+    showError('t2i-results', e.message);
+  } finally {
+    setLoading('btn-t2i', false);
+  }
+}

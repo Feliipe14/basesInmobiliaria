@@ -121,3 +121,24 @@ class ImageSearchResponse(BaseModel):
 class ImageRandomResponse(BaseModel):
     total_results: int
     resultados: List[ImageResult]
+
+
+# ── Texto → Imagen ────────────────────────────────────────────────────────────
+
+class TextToImageRequest(BaseModel):
+    query: str = Field(..., min_length=3, description="Descripción textual de la propiedad a buscar")
+    top_k: int = Field(5, ge=1, le=20, description="Número de imágenes a retornar")
+
+
+class TextToImageResult(BaseModel):
+    media_id: str
+    url: str
+    property_id: str
+    tipo: str
+    score: float
+
+
+class TextToImageResponse(BaseModel):
+    query: str
+    total_results: int
+    resultados: List[TextToImageResult]

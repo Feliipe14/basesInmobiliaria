@@ -34,6 +34,7 @@ from api.models import (
     CompareRequest, CompareResponse, StrategyStats,
     ExperimentResponse, ExperimentRow,
     ImageSearchRequest, ImageSearchResponse, ImageResult, ImageRandomResponse,
+    TextToImageRequest, TextToImageResponse, TextToImageResult,
 )
 
 
@@ -423,6 +424,119 @@ def experiment_results(top_k: int = Query(3, ge=1, le=10)):
 # ---------------------------------------------------------------------------
 # Nuevos endpoints: /stats  /images  /search/images  /evaluations
 # ---------------------------------------------------------------------------
+
+@app.post("/search/text-to-image", response_model=TextToImageResponse, summary="Buscar imágenes por descripción textual")
+def search_text_to_image(req: TextToImageRequest):
+    """
+    Busca imágenes visualmente similares a partir de una descripción textual.
+
+    1. Genera embedding de texto (384d) con all-MiniLM-L6-v2
+    2. Proyecta a 512d con padding de ceros (compatible con CLIP embeddings)
+    3. Busca en image_embeddings usando $vectorSearch con índice vector_index_images
+    4. Si falla, hace búsqueda manual por similitud coseno sobre los primeros 384d
+    """
+    db = get_db()
+    query_vec_384 = embed([req.query])[0]
+
+    # Padding a 512 dimensiones
+    query_vec_512 = query_vec_384 + [0.0] * (512 - len(query_vec_384))
+
+    try:
+        pipeline = [
+            {
+                "$vectorSearch": {
+                    "index": "vector_index_images",
+                    "path": "embedding",
+                    "queryVector": query_vec_512,
+                    "numCandidates": 100,
+                    "limit": req.top_k,
+                }
+            },
+            {
+                "$lookup": {
+                    "from": "media_assets",
+                    "localField": "media_id",
+                    "foreignField": "_id",
+                    "as": "media_info",
+                }
+            },
+            {"$unwind": {"path": "$media_info", "preserveNullAndEmptyArrays": False}},
+            {
+                "$project": {
+                    "_id": 1,
+                    "media_id": 1,
+                    "url": "$media_info.url",
+                    "tipo": "$media_info.tipo",
+                    "property_id": "$media_info.property_id",
+                    "score": {"$meta": "vectorSearchScore"},
+                }
+            },
+        ]
+        raw = list(db["image_embeddings"].aggregate(pipeline))
+    except Exception:
+        # Fallback: búsqueda manual por similitud coseno con 384d
+        import numpy as np
+        from sklearn.metrics.pairwise import cosine_similarity
+
+        all_embeddings = list(db["image_embeddings"].aggregate([
+            {
+                "$lookup": {
+                    "from": "media_assets",
+                    "localField": "media_id",
+                    "foreignField": "_id",
+                    "as": "media_info",
+                }
+            },
+            {"$unwind": {"path": "$media_info", "preserveNullAndEmptyArrays": False}},
+            {
+                "$project": {
+                    "_id": 1,
+                    "media_id": 1,
+                    "embedding": 1,
+                    "url": "$media_info.url",
+                    "tipo": "$media_info.tipo",
+                    "property_id": "$media_info.property_id",
+                }
+            },
+        ]))
+
+        q = np.array(query_vec_384).reshape(1, -1)
+        scored = []
+        for doc in all_embeddings:
+            emb = doc.get("embedding", [])
+            if not emb:
+                continue
+            v = np.array(emb[:384]).reshape(1, -1)
+            sim = float(cosine_similarity(q, v)[0][0])
+            scored.append({
+                "_id": doc["_id"],
+                "media_id": doc["media_id"],
+                "url": doc["url"],
+                "tipo": doc.get("tipo", ""),
+                "property_id": doc.get("property_id", ""),
+                "score": sim,
+            })
+
+        scored.sort(key=lambda x: x["score"], reverse=True)
+        raw = scored[: req.top_k]
+
+    resultados = [
+        TextToImageResult(
+            media_id=r["media_id"],
+            url=r["url"],
+            property_id=r.get("property_id", ""),
+            tipo=r.get("tipo", ""),
+            score=round(r["score"], 4),
+        )
+        for r in raw
+    ]
+
+    return TextToImageResponse(
+        query=req.query,
+        total_results=len(resultados),
+        resultados=resultados,
+    )
+
 
 @app.get("/stats", summary="Estadísticas del sistema")
 def get_stats():
