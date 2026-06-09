@@ -194,6 +194,70 @@ async function main() {
       },
     });
 
+    await ensureCollectionWithValidator(db, "contracts", {
+      $jsonSchema: {
+        bsonType: "object",
+        required: ["listing_id", "arrendador_id", "arrendatario_id"],
+        properties: {
+          listing_id:       { bsonType: "string" },
+          arrendador_id:    { bsonType: "string" },
+          arrendatario_id:  { bsonType: "string" },
+          estado: {
+            enum: ["activo", "finalizado", "cancelado"],
+          },
+          fecha_inicio:      { bsonType: ["date", "string"] },
+          fecha_vencimiento: { bsonType: ["date", "string"] },
+          clausulas: {
+            bsonType: "array",
+            items: {
+              bsonType: "object",
+              required: ["titulo", "descripcion"],
+              properties: {
+                titulo:      { bsonType: "string" },
+                descripcion: { bsonType: "string" },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    await ensureCollectionWithValidator(db, "documents_repository", {
+      $jsonSchema: {
+        bsonType: "object",
+        required: ["tipo", "contenido", "origen_id"],
+        properties: {
+          tipo:     { bsonType: "string" },
+          contenido: { bsonType: "string" },
+          origen_id: { bsonType: "string" },
+          origen_tipo: {
+            enum: ["property", "contract", "chat_session", "general"],
+          },
+          chunking_aplicado: {
+            bsonType: "array",
+            items: { bsonType: "string" },
+          },
+        },
+      },
+    });
+
+    await ensureCollectionWithValidator(db, "rag_evaluations", {
+      $jsonSchema: {
+        bsonType: "object",
+        required: ["rag_query_id"],
+        properties: {
+          rag_query_id:     { bsonType: "string" },
+          relevancia:       { bsonType: ["double", "int"] },
+          precision:        { bsonType: ["double", "int"] },
+          faithfulness:     { bsonType: ["double", "int"] },
+          answer_relevancy: { bsonType: ["double", "int"] },
+          context_recall:   { bsonType: ["double", "int"] },
+          modelo_eval:      { bsonType: "string" },
+          fecha:            { bsonType: ["date", "string"] },
+        },
+      },
+    });
+
     // ==================================================
     // 2) COLECCIONES OPERATIVAS (SIN VALIDADOR)
     // ==================================================
@@ -201,15 +265,12 @@ async function main() {
     const operationalCollections = [
       "agencies",
       "listings",
-      "contracts",
       "chat_sessions",
       "media_assets",
       "maintenance_requests",
       "reviews",
-      "documents_repository",
       "image_embeddings",
       "rag_queries_logs",
-      "rag_evaluations",
     ];
 
     for (const name of operationalCollections) {
@@ -268,6 +329,79 @@ async function main() {
       { listing_id: 1 },
       { name: "ix_chat_sessions_listing_id" },
     );
+
+    // contracts: consulta por estado + fecha de vencimiento
+    await ensureIndex(
+      db.collection("contracts"),
+      { estado: 1, fecha_vencimiento: 1 },
+      { name: "ix_contracts_estado_fecha_vencimiento" },
+    );
+
+    // documents_repository: búsqueda por origen_id y tipo
+    await ensureIndex(
+      db.collection("documents_repository"),
+      { origen_id: 1, tipo: 1 },
+      { name: "ix_documents_repository_origen_tipo" },
+    );
+
+    // documents_repository: texto completo sobre contenido
+    await ensureIndex(
+      db.collection("documents_repository"),
+      { contenido: "text" },
+      { name: "ix_documents_repository_contenido_text", default_language: "spanish" },
+    );
+
+    // rag_queries_logs: timestamp para ordenar historial
+    await ensureIndex(
+      db.collection("rag_queries_logs"),
+      { timestamp: -1 },
+      { name: "ix_rag_queries_logs_timestamp" },
+    );
+
+    // image_embeddings: relación con media_asset
+    await ensureIndex(
+      db.collection("image_embeddings"),
+      { media_id: 1 },
+      { name: "ix_image_embeddings_media_id" },
+    );
+
+    // reviews: target_property_id para listar reseñas por propiedad
+    await ensureIndex(
+      db.collection("reviews"),
+      { target_property_id: 1 },
+      { name: "ix_reviews_target_property_id" },
+    );
+
+    /*
+     * NOTA — Índice Vectorial (Atlas Vector Search):
+     * El índice para document_chunks.embedding y image_embeddings.embedding
+     * NO se crea con db.createIndex(). Se configura en:
+     *   Atlas UI → tu clúster → Search → Create Search Index → JSON Editor
+     *
+     * Definición para document_chunks (384 dimensiones, all-MiniLM-L6-v2):
+     * {
+     *   "fields": [{
+     *     "type": "vector",
+     *     "path": "embedding",
+     *     "numDimensions": 384,
+     *     "similarity": "cosine"
+     *   }]
+     * }
+     *
+     * Definición para image_embeddings (512 dimensiones, CLIP):
+     * {
+     *   "fields": [{
+     *     "type": "vector",
+     *     "path": "embedding",
+     *     "numDimensions": 512,
+     *     "similarity": "cosine"
+     *   }]
+     * }
+     *
+     * Requiere clúster M10+. En M0 (gratuito), la búsqueda vectorial se
+     * hace manualmente calculando similitud coseno en el cliente (Python).
+     * Ver: python/chunking_pipeline.py → función vector_search_manual()
+     */
 
     console.log("Inicialización finalizada correctamente.");
   } finally {

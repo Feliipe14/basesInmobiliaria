@@ -1,0 +1,26 @@
+"""Singleton de conexión MongoDB."""
+
+from pymongo import MongoClient
+from pymongo.database import Database
+
+from config import settings
+
+_client: MongoClient | None = None
+
+
+def get_client() -> MongoClient:
+    global _client
+    if _client is None:
+        _client = MongoClient(settings.mongodb_uri)
+    return _client
+
+
+def get_db() -> Database:
+    return get_client()[settings.db_name]
+
+
+def close():
+    global _client
+    if _client:
+        _client.close()
+        _client = None
