@@ -221,12 +221,13 @@ def log_rag_query(db, query: str, chunks: list[ChunkResult], respuesta: str,
 # Endpoints de la API REST
 # ---------------------------------------------------------------------------
 
-# Endpoint GET /: health check simple, confirma que la API esta viva
-# y muestra la version y enlace a documentacion Swagger
+# **health_check**: endpoint de verificaicon de estado. Confirma que la API
+# esta viva, muestra la version y enlace a la documentacion Swagger
 @app.get("/", summary="Health check")
 def root():
     # **proposito**: endpoint de verificaicon de estado. Retorna informacion
-    # basica del servicio para confirmar que la API esta funcionando
+    # basica del servicio para confirmar que la API esta funcionando.
+    # Internamente solo construye un diccionario JSON con status, version y docs
     return {
         "status": "ok",
         "service": "RAG Inmobiliaria Manizales",
@@ -303,6 +304,8 @@ def search_image(req: ImageSearchRequest):
     )
 
 
+# **endpoint_random_images**: muestra una galeria aleatoria de propiedades del
+# catalogo visual. Util para explorar el inventario de imagenes disponible
 @app.get("/search/image/random", response_model=ImageRandomResponse, summary="Imagenes aleatorias (muestra)")
 def random_images(top_k: int = Query(5, ge=1, le=20)):
     """
@@ -310,7 +313,9 @@ def random_images(top_k: int = Query(5, ge=1, le=20)):
     Util para explorar el catalogo visual antes de hacer busquedas por similitud.
     """
     # **endpoint_random_images**: retorna una muestra aleatoria de imagenes del
-    # catalogo. Usa $sample de MongoDB para seleccionar documentos al azar
+    # catalogo. Usa $sample de MongoDB para seleccionar documentos al azar.
+    # Internamente llama a vector_search_images con media_id=None para obtener
+    # una seleccion aleatoria desde la coleccion image_embeddings
     db = get_db()
     raw = vector_search_images(db, media_id=None, top_k=top_k)
     resultados = images_to_models(raw)
@@ -367,6 +372,8 @@ def rag_query(req: RAGRequest):
     )
 
 
+# **endpoint_compare**: compara el rendimiento de las 3 estrategias de chunking
+# (fixed_size, sentence, semantic) para una misma consulta y muestra metricas
 @app.get("/chunks/compare", response_model=CompareResponse, summary="Compara las 3 estrategias de chunking")
 def compare_strategies(
     query: str = Query(..., min_length=3, description="Consulta a ejecutar en las 3 estrategias"),
@@ -379,7 +386,9 @@ def compare_strategies(
     """
     # **endpoint_compare**: ejecuta una misma consulta en las 3 estrategias
     # y devuelve metricas comparativas: cantidad de chunks, longitud promedio,
-    # score de similitud y total de chunks en base de datos por estrategia
+    # score de similitud y total de chunks en base de datos por estrategia.
+    # Internamente itera sobre fixed_size, sentence y semantic llamando a
+    # vector_search y count_documents para cada estrategia
     db = get_db()
     estrategias_result = []
 
@@ -407,6 +416,8 @@ def compare_strategies(
     return CompareResponse(query=query, estrategias=estrategias_result)
 
 
+# **endpoint_experiment**: ejecuta el experimento completo de 10 consultas
+# predefinidas contra las 3 estrategias de chunking y almacena resultados
 @app.get("/experiment/results", response_model=ExperimentResponse, summary="Experimento de chunking: 10 consultas x 3 estrategias")
 def experiment_results(top_k: int = Query(3, ge=1, le=10)):
     """
@@ -416,7 +427,9 @@ def experiment_results(top_k: int = Query(3, ge=1, le=10)):
     """
     # **endpoint_experiment**: ejecuta el experimento completo con las 10
     # consultas predefinidas para cada estrategia, calcula metricas y las
-    # almacena en MongoDB para analisis posterior
+    # almacena en MongoDB para analisis posterior.
+    # Internamente itera 10 consultas x 3 estrategias, ejecuta vector_search,
+    # calcula promedios de score y longitud, y hace upsert en rag_evaluations
     db = get_db()
     rows: list[ExperimentRow] = []
     eval_col = db["rag_evaluations"]
@@ -501,6 +514,8 @@ def experiment_results(top_k: int = Query(3, ge=1, le=10)):
 # Nuevos endpoints: /stats  /images  /search/images  /evaluations
 # ---------------------------------------------------------------------------
 
+# **endpoint_text_to_image**: busca imagenes del catalogo usando una descripcion
+# textual. Convierte el texto a embedding con CLIP y busca por similitud vectorial
 @app.post("/search/text-to-image", response_model=TextToImageResponse, summary="Buscar imagenes por descripcion textual")
 def search_text_to_image(req: TextToImageRequest):
     """
@@ -610,11 +625,14 @@ def search_text_to_image(req: TextToImageRequest):
     )
 
 
+# **endpoint_stats**: consulta las estadisticas globales del sistema. Retorna
+# conteos de documentos, chunks, imagenes, propiedades y contratos en MongoDB
 @app.get("/stats", summary="Estadisticas del sistema")
 def get_stats():
     # **endpoint_stats**: retorna conteos de todas las colecciones principales
     # de MongoDB para monitorear el estado del sistema: documentos, chunks
-    # (desglosados por estrategia), imagenes, propiedades, contratos y logs
+    # (desglosados por estrategia), imagenes, propiedades, contratos y logs.
+    # Internamente ejecuta count_documents en 7 colecciones de MongoDB
     db = get_db()
     chunks_by_strategy = {
         s: db["document_chunks"].count_documents({"estrategia_chunking": s})
@@ -632,10 +650,14 @@ def get_stats():
     }
 
 
+# **endpoint_images**: obtiene el listado de imagenes del catalogo con sus
+# URLs y metadatos asociados. Permite navegar el inventario visual completo
 @app.get("/images", summary="Lista de imagenes del catalogo")
 def list_images(limit: int = Query(20, ge=1, le=60)):
     # **endpoint_images**: retorna una lista plana de imagenes del catalogo
-    # con sus URLs y metadatos, util para mostrar galerias en el frontend
+    # con sus URLs y metadatos, util para mostrar galerias en el frontend.
+    # Internamente hace un find() en media_assets con proyeccion de campos y
+    # convierte ObjectId a string para serializacion JSON
     db = get_db()
     docs = list(
         db["media_assets"].find(
@@ -647,11 +669,15 @@ def list_images(limit: int = Query(20, ge=1, le=60)):
     return {"images": docs, "total": len(docs)}
 
 
+# **endpoint_search_images**: busca imagenes visualmente similares a partir de
+# un media_id de referencia usando el indice de embeddings CLIP
 @app.post("/search/images", summary="Busqueda de imagenes similares por media_id")
 def search_similar_images(req: ImageSearchRequest):
     # **endpoint_search_images**: endpoint alternativo para busqueda de imagenes
     # similares. Usa vector_search_images con el indice de embeddings de imagenes
-    # y retorna URLs con puntuaciones de similitud
+    # y retorna URLs con puntuaciones de similitud.
+    # Internamente busca el embedding de la imagen de referencia y ejecuta
+    # busqueda por similitud coseno en el indice vector_index_images
     db = get_db()
     raw = vector_search_images(db, media_id=req.media_id, top_k=req.top_k)
     if not raw:
@@ -671,11 +697,15 @@ def search_similar_images(req: ImageSearchRequest):
     }
 
 
+# **endpoint_evaluations**: consulta las evaluaciones de relevancia y precision
+# del experimento de chunking. Ayuda a analizar cual estrategia rinde mejor
 @app.get("/evaluations", summary="Ultimas evaluaciones guardadas")
 def get_evaluations(limit: int = Query(20, ge=1, le=100)):
     # **endpoint_evaluations**: retorna las evaluaciones mas recientes del
     # experimento de chunking, incluyendo relevancia, precision y metadatos
-    # de cada consulta para analizar el rendimiento de las estrategias
+    # de cada consulta para analizar el rendimiento de las estrategias.
+    # Internamente hace un find() en rag_evaluations ordenado por fecha
+    # descendente y convierte ObjectId a string para JSON
     db = get_db()
     docs = list(
         db["rag_evaluations"].find(

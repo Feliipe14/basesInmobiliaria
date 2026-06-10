@@ -187,6 +187,9 @@ function buildHeatmap(rows) {
   var queries = [...new Set(rows.map(function (r) { return r.consulta; }))];
   var strats = ['fixed_size','sentence','semantic'];
 
+  // Asigna un color de fondo segun el valor del score para el mapa de calor.
+  // Los valores altos (>=0.60) usan tonos verdes y los bajos (<0.50) tonos cafe.
+  // Concepto clave: **escala de colores** y **mapa de calor**.
   function heatColor(v) {
     if (v >= 0.80) return '#064e3b';
     if (v >= 0.70) return '#065f46';

@@ -44,6 +44,9 @@ async function doRag() {
   steps.forEach(function (s) { document.getElementById(s).className = 'progress-step waiting'; });
   document.getElementById('rag-progress-bar').style.width = '0%';
 
+  // Activa visualmente un paso de la barra de progreso del pipeline RAG.
+  // Cambia el estilo del paso actual a "active" y el anterior a "done".
+  // Concepto clave: **barra de progreso** y **pasos del pipeline**.
   function activate(idx, delay) {
     delay = delay || 400;
     return new Promise(function (resolve) {
