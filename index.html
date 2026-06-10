@@ -454,8 +454,28 @@
           <li><strong>Answer Relevancy:</strong> ¿La respuesta es relevante para la pregunta? (0–1)</li>
           <li><strong>Context Recall:</strong> ¿El contexto recuperado cubre la respuesta correcta? (0–1)</li>
         </ul>
-        <div class="mt-2 text-xs">Las evaluaciones actuales son <strong>proxy de similitud coseno</strong> (no evaluaciones RAGAS completas con LLM como juez). Para RAGAS completo: <code class="text-accent-cyan">pip install ragas</code>.</div>
+        <div class="mt-2 text-xs">Usa Groq (Llama 3.1) como <strong>LLM juez</strong> para las métricas RAGAS. Las filas en verde indican evaluaciones RAGAS reales.</div>
       </div>
+
+      <!-- Botón para ejecutar evaluación RAGAS desde la UI -->
+      <div class="flex items-center gap-3 flex-wrap">
+        <button id="btn-run-ragas" onclick="runRagasEvaluation()" class="btn-primary text-sm flex items-center gap-2">
+          <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polygon points="5 3 19 12 5 21 5 3"/>
+          </svg>
+          Ejecutar Evaluación RAGAS
+        </button>
+        <button onclick="loadEvaluations()" class="btn-secondary text-xs flex items-center gap-1.5">
+          <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/>
+          </svg>
+          Recargar tabla
+        </button>
+        <span class="text-xs text-text-muted">Procesa 22 preguntas × 3 estrategias — puede tardar 5–10 min</span>
+      </div>
+
+      <!-- Estado de la ejecución RAGAS -->
+      <div id="ragas-run-status"></div>
 
       <div id="evaluations-table"></div>
 
@@ -468,19 +488,35 @@
             Copiar código
           </button>
         </div>
-        <pre id="ragas-code" class="bg-bg-base rounded-lg p-4 text-xs font-mono text-green-300 overflow-x-auto" style="border:1px solid var(--border)"><code>from ragas import evaluate
-from ragas.metrics import faithfulness, answer_relevancy, context_recall
+        <pre id="ragas-code" class="bg-bg-base rounded-lg p-4 text-xs font-mono text-green-300 overflow-x-auto" style="border:1px solid var(--border)"><code># Ejecutar desde: cd python && python evaluacion_ragas.py
+# O usar el botón de arriba para ejecutar desde la API
 
-result = evaluate(
-    dataset=eval_dataset,  # HuggingFace Dataset con columnas:
-                           # question, answer, contexts, ground_truth
-    metrics=[
-        faithfulness,       # ¿respuesta fiel al contexto?
-        answer_relevancy,   # ¿respuesta relevante a la pregunta?
-        context_recall,     # ¿contexto cubre la respuesta correcta?
-    ]
-)
+from ragas import evaluate, EvaluationDataset
+from ragas.metrics import Faithfulness, AnswerRelevancy, ContextRecall
+from ragas.llms import LangchainLLMWrapper
+from ragas.embeddings import LangchainEmbeddingsWrapper
+from langchain_groq import ChatGroq
 
+# Configurar Groq como LLM juez
+groq_llm = LangchainLLMWrapper(ChatGroq(model="llama-3.1-8b-instant"))
+
+metrics = [
+    Faithfulness(llm=groq_llm),       # ¿respuesta fiel al contexto?
+    AnswerRelevancy(llm=groq_llm),    # ¿respuesta relevante a la pregunta?
+    ContextRecall(llm=groq_llm),      # ¿contexto cubre la respuesta correcta?
+]
+
+# Dataset con columnas: user_input, response, retrieved_contexts, reference
+dataset = EvaluationDataset.from_list([
+    {
+        "user_input": "¿Se permiten mascotas?",
+        "response": respuesta_llm,
+        "retrieved_contexts": lista_de_chunks,
+        "reference": respuesta_ground_truth,
+    }
+])
+
+result = evaluate(dataset=dataset, metrics=metrics)
 print(result.to_pandas())</code></pre>
       </div>
     </div>

@@ -15,6 +15,8 @@ Iniciar:
 
 import sys
 import time
+import asyncio
+import concurrent.futures
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from typing import Optional
@@ -697,15 +699,12 @@ def search_similar_images(req: ImageSearchRequest):
     }
 
 
-# **endpoint_evaluations**: consulta las evaluaciones de relevancia y precision
-# del experimento de chunking. Ayuda a analizar cual estrategia rinde mejor
-@app.get("/evaluations", summary="Ultimas evaluaciones guardadas")
+# **endpoint_evaluations**: retorna las evaluaciones guardadas, incluyendo tanto
+# las métricas proxy (cosine_similarity) como las evaluaciones RAGAS reales.
+@app.get("/evaluations", summary="Ultimas evaluaciones guardadas (proxy y RAGAS)")
 def get_evaluations(limit: int = Query(20, ge=1, le=100)):
-    # **endpoint_evaluations**: retorna las evaluaciones mas recientes del
-    # experimento de chunking, incluyendo relevancia, precision y metadatos
-    # de cada consulta para analizar el rendimiento de las estrategias.
-    # Internamente hace un find() en rag_evaluations ordenado por fecha
-    # descendente y convierte ObjectId a string para JSON
+    # Incluye campos RAGAS reales (faithfulness, answer_relevancy, context_recall)
+    # cuando existen, además de los campos proxy clásicos.
     db = get_db()
     docs = list(
         db["rag_evaluations"].find(
@@ -713,9 +712,17 @@ def get_evaluations(limit: int = Query(20, ge=1, le=100)):
             {
                 "_id": 1,
                 "rag_query_id": 1,
+                "question": 1,
                 "relevancia": 1,
                 "precision": 1,
+                "faithfulness": 1,
+                "answer_relevancy": 1,
+                "context_recall": 1,
                 "modelo_eval": 1,
+                "modelo_llm": 1,
+                "estrategia_chunking": 1,
+                "respuesta_generada": 1,
+                "ground_truth": 1,
                 "fecha": 1,
                 "_meta": 1,
             },
@@ -724,3 +731,67 @@ def get_evaluations(limit: int = Query(20, ge=1, le=100)):
     for d in docs:
         d["_id"] = str(d["_id"])
     return {"evaluaciones": docs, "total": len(docs)}
+
+
+# **endpoint_run_ragas**: ejecuta el pipeline completo de evaluación RAGAS
+# para una o todas las estrategias de chunking y guarda los resultados.
+@app.post("/evaluations/run-ragas", summary="Ejecutar evaluación RAGAS completa")
+async def run_ragas_endpoint(
+    strategy: Optional[str] = Query(
+        None,
+        description="Estrategia a evaluar: fixed_size | sentence | semantic (omitir = todas)",
+    ),
+    top_k: int = Query(5, ge=1, le=10, description="Chunks a recuperar por pregunta"),
+):
+    """
+    Lanza el pipeline de evaluación RAGAS para la(s) estrategia(s) indicadas.
+
+    - Ejecuta vector_search() para cada una de las 22 preguntas de ground truth.
+    - Genera respuestas con Groq (Llama 3.1) como LLM principal.
+    - Evalúa con RAGAS usando Groq como LLM juez (faithfulness, answer_relevancy,
+      context_recall).
+    - Guarda los resultados en la colección **rag_evaluations** (upsert por _id).
+    - Retorna un resumen con los promedios por estrategia.
+
+    **Nota**: la evaluación puede tardar varios minutos dependiendo de la
+    cantidad de preguntas y la latencia de Groq.
+    """
+    if strategy and strategy not in ("fixed_size", "sentence", "semantic", "all"):
+        raise HTTPException(
+            status_code=422,
+            detail="strategy debe ser: fixed_size, sentence, semantic o all",
+        )
+
+    strategies = (
+        ["fixed_size", "sentence", "semantic"]
+        if (strategy is None or strategy == "all")
+        else [strategy]
+    )
+
+    try:
+        from evaluacion_ragas import run_ragas_evaluation  # type: ignore
+    except ImportError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                f"RAGAS no disponible: {exc}. "
+                "Instala con: pip install ragas>=0.2.0 langchain-groq>=0.1.9"
+            ),
+        ) from exc
+
+    # Run in a thread pool so RAGAS can create its own asyncio event loop internally
+    loop = asyncio.get_event_loop()
+    try:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+            summary = await loop.run_in_executor(
+                pool,
+                lambda: run_ragas_evaluation(strategies=strategies, top_k=top_k),
+            )
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+    return {
+        "status": "ok",
+        "estrategias_evaluadas": strategies,
+        "resumen": summary,
+    }

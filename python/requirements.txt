@@ -26,3 +26,10 @@ python-dotenv==1.0.1
 # Utilidades numéricas
 numpy==1.26.4
 scikit-learn==1.5.1
+
+# Evaluación RAGAS — métricas reales de calidad RAG (faithfulness, answer_relevancy, context_recall)
+ragas>=0.2.0
+datasets>=2.14.0
+langchain-groq>=0.1.9
+# Necesario para el shim de compatibilidad de langchain_community con RAGAS 0.4.x
+langchain-google-vertexai>=1.0.0
