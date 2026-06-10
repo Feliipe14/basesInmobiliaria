@@ -25,32 +25,35 @@ El sistema almacena y procesa **100 documentos de texto** y **60 imagenes asocia
 
 ### 2.2 Componentes del Sistema
 
-| Componente | Tecnologia | Proposito |
-|---|---|---|
-| Base de Datos | MongoDB Atlas M0 (512 MB) | Almacenamiento NoSQL + Vector Search |
-| API | Python FastAPI | Endpoints REST para busqueda y RAG |
-| Frontend | HTML + CSS + JavaScript vanilla | Interfaz de usuario monolitica (SPA) |
-| Embeddings Texto | sentence-transformers/all-MiniLM-L6-v2 (384 dim) | Busqueda semantica texto a texto |
-| Embeddings Imagen | openai/clip-vit-base-patch32 (512 dim) | Busqueda multimodal texto a imagen e imagen a imagen |
-| LLM | Groq API + Llama 3.1 (8B instant) | Generacion de respuestas contextualizadas |
-| Chunking | langchain + logica personalizada | 3 estrategias: fixed, sentence, semantic |
+| Componente        | Tecnologia                                       | Proposito                                            |
+| ----------------- | ------------------------------------------------ | ---------------------------------------------------- |
+| Base de Datos     | MongoDB Atlas M0 (512 MB)                        | Almacenamiento NoSQL + Vector Search                 |
+| API               | Python FastAPI                                   | Endpoints REST para busqueda y RAG                   |
+| Frontend          | HTML + CSS + JavaScript vanilla                  | Interfaz de usuario monolitica (SPA)                 |
+| Embeddings Texto  | sentence-transformers/all-MiniLM-L6-v2 (384 dim) | Busqueda semantica texto a texto                     |
+| Embeddings Imagen | openai/clip-vit-base-patch32 (512 dim)           | Busqueda multimodal texto a imagen e imagen a imagen |
+| LLM               | Groq API + Llama 3.1 (8B instant)                | Generacion de respuestas contextualizadas            |
+| Chunking          | langchain + logica personalizada                 | 3 estrategias: fixed, sentence, semantic             |
 
 ### 2.3 Estrategia de Modelado NoSQL
 
 Siguiendo las recomendaciones del documento del proyecto, se aplicaron tres estrategias de diseño:
 
 **Embedded (datos incrustados):**
+
 - Ratings y scores calculados se almacenan directamente en el documento de propiedad
 - Historial de consultas del usuario como subdocumentos
 - Metadatos pequenos como ubicacion y caracteristicas van dentro de la propiedad
 
 **Referenced (referencias entre colecciones):**
+
 - Las imagenes (media_assets) referencian a propiedades mediante `property_id`
 - Los usuarios referencian agencias mediante `agency_id`
 - Los chunks referencian documentos fuente mediante `doc_id`
 - Los contratos referencian propiedades y usuarios involucrados
 
 **Hibrido (mixto):**
+
 - El documento principal de propiedad tiene `media_ids` como arreglo de referencias
 - Pero los embeddings de metadatos se almacenan junto al chunk
 - Las listas de media_ids permiten consultas eficientes sin cargar las imagenes completas
@@ -59,22 +62,22 @@ Siguiendo las recomendaciones del documento del proyecto, se aplicaron tres estr
 
 ## 3. Colecciones MongoDB (14 colecciones)
 
-| # | Coleccion | Proposito | Documentos |
-|---|---|---|---|
-| 1 | `users` | Usuarios del sistema (propietarios, agentes, arrendatarios) | 13 |
-| 2 | `agencies` | Agencias inmobiliarias | 3 |
-| 3 | `properties` | Propiedades con datos estructurados y coordenadas GeoJSON | 20 |
-| 4 | `media_assets` | URLs de imagenes reales de Unsplash por propiedad | 60 |
-| 5 | `listings` | Publicaciones de venta o arriendo | 20 |
-| 6 | `contracts` | Contratos con clausulas y fechas | 15 |
-| 7 | `reviews` | Resenas de propiedades por arrendatarios | 20 |
-| 8 | `maintenance_requests` | Solicitudes de mantenimiento | 10 |
-| 9 | `documents_repository` | Documentos fuente del dominio inmobiliario | 100 |
-| 10 | `document_chunks` | Chunks de texto vectorizados con MiniLM | ~900 (3 estrategias) |
-| 11 | `image_embeddings` | Embeddings de imagen generados con CLIP | 60 |
-| 12 | `rag_queries_logs` | Registro de consultas realizadas al sistema | Variables |
-| 13 | `rag_evaluations` | Evaluaciones y respuestas guardadas | Variables |
-| 14 | `chat_sessions` | Sesiones de chat (planeado) | 15 |
+| #   | Coleccion              | Proposito                                                   | Documentos           |
+| --- | ---------------------- | ----------------------------------------------------------- | -------------------- |
+| 1   | `users`                | Usuarios del sistema (propietarios, agentes, arrendatarios) | 13                   |
+| 2   | `agencies`             | Agencias inmobiliarias                                      | 3                    |
+| 3   | `properties`           | Propiedades con datos estructurados y coordenadas GeoJSON   | 20                   |
+| 4   | `media_assets`         | URLs de imagenes reales de Unsplash por propiedad           | 60                   |
+| 5   | `listings`             | Publicaciones de venta o arriendo                           | 20                   |
+| 6   | `contracts`            | Contratos con clausulas y fechas                            | 15                   |
+| 7   | `reviews`              | Resenas de propiedades por arrendatarios                    | 20                   |
+| 8   | `maintenance_requests` | Solicitudes de mantenimiento                                | 10                   |
+| 9   | `documents_repository` | Documentos fuente del dominio inmobiliario                  | 100                  |
+| 10  | `document_chunks`      | Chunks de texto vectorizados con MiniLM                     | ~900 (3 estrategias) |
+| 11  | `image_embeddings`     | Embeddings de imagen generados con CLIP                     | 60                   |
+| 12  | `rag_queries_logs`     | Registro de consultas realizadas al sistema                 | Variables            |
+| 13  | `rag_evaluations`      | Evaluaciones y respuestas guardadas                         | Variables            |
+| 14  | `chat_sessions`        | Sesiones de chat (planeado)                                 | 15                   |
 
 ### 3.1 Ejemplo de Documento: Properties
 
@@ -109,6 +112,7 @@ Siguiendo las recomendaciones del documento del proyecto, se aplicaron tres estr
 ### 3.3 Schema Validation
 
 Se implementaron reglas de validacion en MongoDB para:
+
 - `properties`: `_id` obligatorio con formato `prop_XXX`, `ubicacion.geo` debe ser Point valido
 - `media_assets`: `url` debe ser string, `tipo` debe ser uno de los valores permitidos
 - `document_chunks`: `embedding` debe ser arreglo de 384 floats, `estrategia_chunking` debe ser fixed_size, sentence o semantic
@@ -119,20 +123,20 @@ Se implementaron reglas de validacion en MongoDB para:
 
 ### 4.1 Indices Normales
 
-| Coleccion | Indice | Tipo |
-|---|---|---|
-| `document_chunks` | `{ doc_id: 1 }` | Simple |
-| `document_chunks` | `{ estrategia_chunking: 1 }` | Simple |
-| `document_chunks` | `{ "chunk_metadata.tipo_doc": 1 }` | Simple |
-| `properties` | `{ "ubicacion.geo": "2dsphere" }` | Geoespacial |
-| `media_assets` | `{ property_id: 1 }` | Simple |
+| Coleccion         | Indice                             | Tipo        |
+| ----------------- | ---------------------------------- | ----------- |
+| `document_chunks` | `{ doc_id: 1 }`                    | Simple      |
+| `document_chunks` | `{ estrategia_chunking: 1 }`       | Simple      |
+| `document_chunks` | `{ "chunk_metadata.tipo_doc": 1 }` | Simple      |
+| `properties`      | `{ "ubicacion.geo": "2dsphere" }`  | Geoespacial |
+| `media_assets`    | `{ property_id: 1 }`               | Simple      |
 
 ### 4.2 Indices Vectoriales (Atlas Vector Search)
 
-| Nombre Indice | Coleccion | Campo | Dimensiones | Similitud |
-|---|---|---|---|---|
-| `vector_index_texto` | `document_chunks` | `embedding` | 384 (MiniLM) | cosine |
-| `vector_index_images` | `image_embeddings` | `embedding` | 512 (CLIP) | cosine |
+| Nombre Indice         | Coleccion          | Campo       | Dimensiones  | Similitud |
+| --------------------- | ------------------ | ----------- | ------------ | --------- |
+| `vector_index_chunks` | `document_chunks`  | `embedding` | 384 (MiniLM) | cosine    |
+| `vector_index_images` | `image_embeddings` | `embedding` | 512 (CLIP)   | cosine    |
 
 Ambos indices se crearon manualmente desde la interfaz de Atlas (Atlas Search → Create Search Index → JSON Editor).
 
@@ -173,37 +177,54 @@ Se ejecutaron **10 consultas de prueba** sobre las 3 estrategias de chunking. Pa
 
 Las consultas fueron seleccionadas para cubrir los tipos de preguntas mas comunes en el dominio inmobiliario:
 
-| # | Consulta | Categoria |
-|---|---|---|
-| 1 | "Se permiten mascotas en el apartamento?" | Reglas y politicas |
-| 2 | "Cual es el valor del arriendo mensual?" | Costos y precios |
-| 3 | "Que incluye el contrato de arrendamiento?" | Documentos legales |
-| 4 | "Cuantas habitaciones tiene la propiedad?" | Caracteristicas fisicas |
-| 5 | "Que servicios publicos estan incluidos?" | Servicios |
-| 6 | "Cual es la politica de mascotas en el edificio?" | Reglamentos |
-| 7 | "Como se calcula la administracion?" | Costos recurrentes |
-| 8 | "Que documentos se necesitan para arrendar?" | Tramites |
-| 9 | "Hay parqueadero disponible?" | Amenidades |
-| 10 | "Cual es el procedimiento para mantenimiento?" | Soporte |
+| #   | Consulta                                          | Categoria               |
+| --- | ------------------------------------------------- | ----------------------- |
+| 1   | "Se permiten mascotas en el apartamento?"         | Reglas y politicas      |
+| 2   | "Cual es el valor del arriendo mensual?"          | Costos y precios        |
+| 3   | "Que incluye el contrato de arrendamiento?"       | Documentos legales      |
+| 4   | "Cuantas habitaciones tiene la propiedad?"        | Caracteristicas fisicas |
+| 5   | "Que servicios publicos estan incluidos?"         | Servicios               |
+| 6   | "Cual es la politica de mascotas en el edificio?" | Reglamentos             |
+| 7   | "Como se calcula la administracion?"              | Costos recurrentes      |
+| 8   | "Que documentos se necesitan para arrendar?"      | Tramites                |
+| 9   | "Hay parqueadero disponible?"                     | Amenidades              |
+| 10  | "Cual es el procedimiento para mantenimiento?"    | Soporte                 |
 
 ### 6.2 Resultados Cuantitativos
 
-| Metrica | Fixed-Size | Sentence-Aware | Semantic |
-|---|---|---|---|
-| Total chunks generados | ~320 | ~300 | ~280 |
-| Longitud promedio | 1024 caracteres | 850 caracteres | 780 caracteres |
-| Score promedio top-1 | 0.72 | 0.78 | 0.81 |
-| Cobertura de informacion | Media | Alta | Muy Alta |
+A continuacion se presentan los resultados obtenidos al ejecutar las 10 consultas sobre las 3 estrategias:
+
+| Consulta                        | Fixed-Size (score) | Sentence (score) | Semantic (score) | Ganadora |
+| ------------------------------- | ------------------ | ---------------- | ---------------- | -------- |
+| Se permiten mascotas?           | 0.8467             | 0.8522           | **0.8872**       | Semantic |
+| Valor del arriendo mensual?     | 0.7627             | 0.7580           | **0.7985**       | Semantic |
+| Cuantas habitaciones tiene?     | 0.7601             | 0.7759           | **0.8141**       | Semantic |
+| Que incluye el contrato?        | 0.8350             | 0.8380           | **0.8592**       | Semantic |
+| Ubicacion exacta del inmueble?  | 0.7742             | 0.7766           | **0.8159**       | Semantic |
+| Servicios publicos incluidos?   | 0.8153             | 0.8265           | **0.8724**       | Semantic |
+| Restricciones para subarrendar? | 0.7725             | 0.7725           | **0.7966**       | Semantic |
+| Condiciones del pago del canon? | 0.7944             | 0.8169           | **0.8497**       | Semantic |
+| Como es la cocina?              | 0.7954             | 0.7398           | **0.8100**       | Semantic |
+| Opiniones de otros usuarios?    | 0.7476             | 0.7649           | **0.7816**       | Semantic |
+
+**Resumen global por estrategia:**
+
+| Metrica                   | Fixed-Size | Sentence | Semantic   |
+| ------------------------- | ---------- | -------- | ---------- |
+| Total chunks en BD        | 412        | 561      | 2143       |
+| Longitud promedio (chars) | 777.8      | 481.5    | 237.2      |
+| Score promedio global     | 0.7904     | 0.7921   | **0.8285** |
+| Consultas ganadas         | 0          | 0        | 10 de 10   |
 
 ### 6.3 Interpretacion de Resultados
 
-La estrategia **semantica** obtuvo los mejores puntajes de similitud porque agrupa oraciones tematicamente coherentes. Sin embargo, para el dominio inmobiliario donde las preguntas son concretas (precio, area, mascotas), la estrategia **sentence-aware** ofrecieron el mejor equilibrio entre cobertura y precision.
+La estrategia **semantica** gano las 10 consultas con un score promedio de **0.8285**, superando a sentence (0.7921) y fixed-size (0.7904). Esto se debe a que el chunking semantico agrupa oraciones por tema, produciendo chunks tematicamente coherentes que el `$vectorSearch` puede emparejar mejor con la intencion de la consulta.
 
-La estrategia **fixed-size** tiende a cortar informacion relevante en medio de una oracion, lo que reduce la calidad del contexto recuperado.
+Sin embargo, la estrategia semantica produce chunks mucho mas cortos (237 caracteres promedio vs 778 de fixed-size) porque los documentos inmobiliarios cambian frecuentemente de tema. Esto significa que se necesitan mas chunks para cubrir la misma informacion. La estrategia **sentence** ofrece el mejor equilibrio: chunks coherentes (481 caracteres) con buena puntuacion (0.7921) y la mitad de chunks que semantic.
 
 ### 6.4 Conclusion
 
-Para el dominio inmobiliario, se recomienda **sentence-aware chunking** como estrategia principal por su capacidad de mantener oraciones completas (ideal para preguntas especificas como "cuantas habitaciones") y su simplicidad computacional frente a la estrategia semantica que requiere embeddings por oracion. La estrategia semantica se recomienda como complemento para consultas complejas que requieren sintesis de multiples fuentes.
+Para el dominio inmobiliario, la estrategia **semantica** ofrece la mejor precision de busqueda, pero la estrategia **sentence** es la mas equilibrada en terminos de cobertura vs calidad. Se recomienda un enfoque hibrido: usar semantic para documentos legales (contratos, reglamentos) donde cada clausula es un tema distinto, y sentence para descripciones de propiedades y chats donde las oraciones completas son mas informativas. La estrategia fixed-size queda como opcion rapida para ingesta inicial por su simplicidad computacional.
 
 ---
 
@@ -213,21 +234,23 @@ Para el dominio inmobiliario, se recomienda **sentence-aware chunking** como est
 
 Para evaluar la calidad de la busqueda semantica, se realizaron pruebas con consultas de diferentes categorias:
 
-| Consulta | Estrategia optima | Score promedio | Observacion |
-|---|---|---|---|
-| "Se permiten mascotas?" | semantic | 0.81 | Encontro chunks del FAQ y reglamentos |
-| "Valor del arriendo?" | sentence | 0.78 | Chunks de contratos con clausulas de canon |
-| "Cuantas habitaciones?" | sentence | 0.76 | Descripciones de propiedades con datos exactos |
-| "Que incluye el contrato?" | semantic | 0.83 | Agrupo multiples clausulas del mismo tema |
-| "Como se calcula la administracion?" | fixed_size | 0.72 | Pregunta especifica encontro el dato exacto |
+| Consulta                        | Estrategia optima | Score promedio | Observacion                                    |
+| ------------------------------- | ----------------- | -------------- | ---------------------------------------------- |
+| "Se permiten mascotas?"         | semantic          | 0.8872         | Encontro chunks del FAQ y reglamentos          |
+| "Valor del arriendo?"           | semantic          | 0.7985         | Chunks de contratos con clausulas de canon     |
+| "Cuantas habitaciones?"         | semantic          | 0.8141         | Descripciones de propiedades con datos exactos |
+| "Que incluye el contrato?"      | semantic          | 0.8592         | Agrupo multiples clausulas del mismo tema      |
+| "Servicios publicos incluidos?" | semantic          | 0.8724         | Chunks de FAQ sobre servicios                  |
 
 **Conclusion:** El sistema recupera consistentemente los chunks relevantes para preguntas del dominio inmobiliario. La estrategia optima depende del tipo de pregunta: semantica para preguntas conceptuales, sentence para datos concretos.
 
 ### 7.2 Evaluacion de Busqueda Multimodal
 
-**Imagen a imagen:** Se probo con imagenes de fachada de referencia. El sistema retorno otras fachadas con scores superiores a 0.85, demostrando que los embeddings CLIP capturan correctamente caracteristicas visuales.
+**Imagen a imagen:** Se probo con imagenes de fachada como referencia. El sistema retorno otras fachadas visualmente similares con scores altos, demostrando que los embeddings CLIP generados con openai/clip-vit-base-patch32 capturan correctamente las caracteristicas visuales de las imagenes.
 
-**Texto a imagen:** Consultas como "fachada moderna" retornaron predominantemente imagenes de tipo `imagen_fachada`, confirmando que CLIP alinea correctamente los espacios vectoriales de texto e imagen.
+**Texto a imagen:** Consultas como "fachada moderna" retornaron predominantemente imagenes de tipo `imagen_fachada`, mientras que "sala amplia" retorno imagenes de tipo `imagen_sala`, confirmando que CLIP alinea correctamente los espacios vectoriales de texto e imagen.
+
+**Imagen a texto via RAG:** Al seleccionar una imagen en la galeria, el sistema permite identificar su propiedad asociada y realizar consultas RAG sobre los documentos relacionados, cerrando el ciclo multimodal completo.
 
 ### 7.3 Evaluacion del Pipeline RAG
 
@@ -242,24 +265,25 @@ El pipeline RAG completo se evaluo cualitativamente:
 
 ## 8. API REST - Endpoints Documentados
 
-| Metodo | Ruta | Proposito | Request | Response |
-|---|---|---|---|---|
-| GET | `/` | Health check | - | `{ "status": "ok", "db": "..." }` |
-| POST | `/search` | Busqueda vectorial texto-texto | `{ query, top_k, estrategia }` | `{ resultados, total }` |
-| POST | `/rag` | Pipeline RAG completo | `{ query, top_k, estrategia }` | `{ respuesta, contexto, chunks }` |
-| POST | `/search/image` | Busqueda imagen-imagen | `{ media_id, top_k }` | `{ media_id_referencia, resultados }` |
-| GET | `/search/image/random` | Galeria aleatoria | `top_k` | `{ resultados }` |
-| POST | `/search/text-to-image` | Busqueda texto-imagen | `{ query, top_k }` | `{ resultados }` |
-| GET | `/chunks/compare` | Comparar estrategias | `{ query, top_k }` | `{ fixed, sentence, semantic }` |
-| GET | `/experiment/results` | Resultados experimento | `top_k` | `{ estrategias, consultas, scores }` |
-| GET | `/stats` | Estadisticas del sistema | - | `{ colecciones, totales }` |
-| GET | `/evaluations` | Evaluaciones guardadas | `limit` | `{ evaluaciones }` |
+| Metodo | Ruta                    | Proposito                      | Request                        | Response                              |
+| ------ | ----------------------- | ------------------------------ | ------------------------------ | ------------------------------------- |
+| GET    | `/`                     | Health check                   | -                              | `{ "status": "ok", "db": "..." }`     |
+| POST   | `/search`               | Busqueda vectorial texto-texto | `{ query, top_k, estrategia }` | `{ resultados, total }`               |
+| POST   | `/rag`                  | Pipeline RAG completo          | `{ query, top_k, estrategia }` | `{ respuesta, contexto, chunks }`     |
+| POST   | `/search/image`         | Busqueda imagen-imagen         | `{ media_id, top_k }`          | `{ media_id_referencia, resultados }` |
+| GET    | `/search/image/random`  | Galeria aleatoria              | `top_k`                        | `{ resultados }`                      |
+| POST   | `/search/text-to-image` | Busqueda texto-imagen          | `{ query, top_k }`             | `{ resultados }`                      |
+| GET    | `/chunks/compare`       | Comparar estrategias           | `{ query, top_k }`             | `{ fixed, sentence, semantic }`       |
+| GET    | `/experiment/results`   | Resultados experimento         | `top_k`                        | `{ estrategias, consultas, scores }`  |
+| GET    | `/stats`                | Estadisticas del sistema       | -                              | `{ colecciones, totales }`            |
+| GET    | `/evaluations`          | Evaluaciones guardadas         | `limit`                        | `{ evaluaciones }`                    |
 
 ---
 
 ## 9. Pipeline Multimodal
 
 ### 9.1 Texto a Texto
+
 ```
 consulta del usuario
        |
@@ -267,7 +291,7 @@ consulta del usuario
 all-MiniLM-L6-v2 (embedding 384d)
        |
        v
-$vectorSearch en document_chunks (indice: vector_index_texto)
+$vectorSearch en document_chunks (indice: vector_index_chunks)
        |
        v
 top-k chunks recuperados + construccion de contexto
@@ -280,6 +304,7 @@ respuesta final al usuario
 ```
 
 ### 9.2 Texto a Imagen
+
 ```
 descripcion textual del usuario (ej: "fachada moderna")
        |
@@ -294,6 +319,7 @@ imagenes visualmente similares
 ```
 
 ### 9.3 Imagen a Imagen
+
 ```
 imagen de referencia
        |
@@ -311,7 +337,7 @@ imagenes visualmente similares
 
 ## 10. Lecciones Aprendidas y Recomendaciones
 
-### 9.1 Lecciones Aprendidas
+### 10.1 Lecciones Aprendidas
 
 1. **El chunking afecta directamente la calidad RAG**: La estrategia de chunking es la decision mas importante en un sistema RAG. Una mala fragmentacion produce contexto insuficiente o ruidoso.
 
@@ -323,7 +349,7 @@ imagenes visualmente similares
 
 5. **El modelo de datos hibrido fue adecuado**: Las referencias entre colecciones permiten actualizar imagenes sin modificar propiedades, y los embeddings incrustados en los chunks permiten busqueda eficiente.
 
-### 9.2 Recomendaciones
+### 10.2 Recomendaciones
 
 1. **Implementar RAGAS**: Para una evaluacion objetiva de la calidad del sistema, se recomienda integrar el framework RAGAS con las metricas de faithfulness, answer relevancy y context recall.
 
@@ -337,16 +363,16 @@ imagenes visualmente similares
 
 ## 11. Comparacion con Enfoque Relacional
 
-| Aspecto | SQL (Relacional) | MongoDB (NoSQL) |
-|---|---|---|
-| **Modelado** | Esquema rigido con tablas normalizadas | Esquema flexible, documentos embebidos o referenciados |
-| **Embeddings** | Tabla separada con JOINs costosos | Misma coleccion o coleccion dedicada con $lookup |
-| **Vector Search** | No nativo, requiere extension externa (pgvector) | Nativo con Atlas Vector Search y $vectorSearch |
-| **Geoespacial** | PostGIS (extension) | Nativo con GeoJSON e indices 2dsphere |
-| **Escalabilidad** | Vertical principalmente | Horizontal nativa (sharding) |
-| **Consultas hibridas** | Multiples queries o funciones complejas | Un solo pipeline de agregacion con $vectorSearch + filtros |
-| **Schema Validation** | Obligatorio (DDL) | Opcional, con validacion a nivel de documento |
-| **Flexibilidad** | Cambios requieren migraciones | Cambios sin downtime, documentos con campos distintos |
+| Aspecto                | SQL (Relacional)                                 | MongoDB (NoSQL)                                            |
+| ---------------------- | ------------------------------------------------ | ---------------------------------------------------------- |
+| **Modelado**           | Esquema rigido con tablas normalizadas           | Esquema flexible, documentos embebidos o referenciados     |
+| **Embeddings**         | Tabla separada con JOINs costosos                | Misma coleccion o coleccion dedicada con $lookup           |
+| **Vector Search**      | No nativo, requiere extension externa (pgvector) | Nativo con Atlas Vector Search y $vectorSearch             |
+| **Geoespacial**        | PostGIS (extension)                              | Nativo con GeoJSON e indices 2dsphere                      |
+| **Escalabilidad**      | Vertical principalmente                          | Horizontal nativa (sharding)                               |
+| **Consultas hibridas** | Multiples queries o funciones complejas          | Un solo pipeline de agregacion con $vectorSearch + filtros |
+| **Schema Validation**  | Obligatorio (DDL)                                | Opcional, con validacion a nivel de documento              |
+| **Flexibilidad**       | Cambios requieren migraciones                    | Cambios sin downtime, documentos con campos distintos      |
 
 **Conclusion:** MongoDB ofrece ventajas significativas para sistemas RAG al integrar de forma nativa el almacenamiento de documentos, busqueda vectorial y consultas hibridas en una sola plataforma, sin necesidad de servicios externos ni migraciones de esquema.
 
@@ -389,5 +415,12 @@ python -m http.server 3000
 ## 13. Creditos
 
 **Proyecto:** Sistema RAG NoSQL con MongoDB - Inmobiliaria Manizales
+
 **Curso:** Bases de Datos No Relacionales
+
+**Integrantes:**
+
+- Joaquín Bermúdez Murcia
+- Juan Felipe Hernández Montoya
+
 **Tecnologias:** MongoDB Atlas, Python FastAPI, CLIP, MiniLM, Groq LLM
