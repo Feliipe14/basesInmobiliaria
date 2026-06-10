@@ -1,0 +1,76 @@
+{
+    "coleccion": "properties",
+    "datos": [
+        {
+            "_id": "prop_021",
+            "owner_id": "u_001",
+            "titulo": "Casa campestre en la Enea",
+            "descripcion": "Hermosa casa campestre con jardin amplio y piscina. Ubicada en el sector de la Enea, Manizales. Ideal para familia que busca tranquilidad y contacto con la naturaleza.",
+            "tipo_inmueble": "casa",
+            "ubicacion": {
+                "ciudad": "Manizales",
+                "barrio": "La Enea",
+                "direccion": "Carrera 23 # 45-12",
+                "geo": {
+                    "type": "Point",
+                    "coordinates": [-75.510, 5.075]
+                }
+            },
+            "caracteristicas": {
+                "area": 180,
+                "area_construida": 150,
+                "habitaciones": 4,
+                "banos": 3,
+                "parqueadero": 2,
+                "estrato": 5,
+                "pisos": 2
+            },
+            "servicios": ["agua", "luz", "gas", "internet", "piscina", "jardin"],
+            "reglas": {
+                "mascotas": true,
+                "max_mascotas": 3,
+                "permite_fiestas": false,
+                "horario_silencio": "10:00 PM - 7:00 AM"
+            },
+            "valor_administracion": 250000,
+            "fecha_registro": "2025-08-15T10:00:00Z",
+            "media_ids": [
+                "med_prop_021_01",
+                "med_prop_021_02",
+                "med_prop_021_03"
+            ],
+            "tags": ["casa campestre", "piscina", "jardin", "familia", "la enea"]
+        },
+        {
+            "_id": "prop_022",
+            "owner_id": "u_003",
+            "titulo": "Local comercial en el Centro",
+            "descripcion": "Local comercial de 80 metros cuadrados en pleno centro de Manizales. Excelente vitrina comercial, alta afluencia de publico. Ideal para tienda, oficina o restaurante.",
+            "tipo_inmueble": "local",
+            "ubicacion": {
+                "ciudad": "Manizales",
+                "barrio": "Centro",
+                "direccion": "Calle 21 # 19-34",
+                "geo": {
+                    "type": "Point",
+                    "coordinates": [-75.515, 5.067]
+                }
+            },
+            "caracteristicas": {
+                "area": 80,
+                "area_construida": 75,
+                "banos": 2,
+                "parqueadero": 0,
+                "estrato": 4
+            },
+            "servicios": ["agua", "luz", "internet"],
+            "fecha_registro": "2025-09-01T08:00:00Z",
+            "media_ids": [
+                "med_prop_022_01",
+                "med_prop_022_02",
+                "med_prop_022_03"
+            ],
+            "tags": ["local comercial", "centro", "vitrina", "alto trafico"]
+        }
+    ]
+}
