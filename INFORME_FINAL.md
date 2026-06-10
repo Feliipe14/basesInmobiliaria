@@ -164,18 +164,27 @@ Agrupa oraciones por similitud semantica usando embeddings de MiniLM. Umbral de 
 
 ### 6.1 Metodologia
 
-Se ejecutaron **10 consultas de prueba** sobre las 3 estrategias de chunking:
+Se ejecutaron **10 consultas de prueba** sobre las 3 estrategias de chunking. Para cada consulta se midio:
 
-1. "Se permiten mascotas en el apartamento?"
-2. "Cual es el valor del arriendo mensual?"
-3. "Que incluye el contrato de arrendamiento?"
-4. "Cuantas habitaciones tiene la propiedad?"
-5. "Que servicios publicos estan incluidos?"
-6. "Cual es la politica de mascotas en el edificio?"
-7. "Como se calcula la administracion?"
-8. "Que documentos se necesitan para arrendar?"
-9. "Hay parqueadero disponible?"
-10. "Cual es el procedimiento para mantenimiento?"
+- Cantidad de chunks recuperados
+- Longitud promedio de los chunks en caracteres
+- Score promedio de similitud coseno
+- Tiempo de respuesta
+
+Las consultas fueron seleccionadas para cubrir los tipos de preguntas mas comunes en el dominio inmobiliario:
+
+| # | Consulta | Categoria |
+|---|---|---|
+| 1 | "Se permiten mascotas en el apartamento?" | Reglas y politicas |
+| 2 | "Cual es el valor del arriendo mensual?" | Costos y precios |
+| 3 | "Que incluye el contrato de arrendamiento?" | Documentos legales |
+| 4 | "Cuantas habitaciones tiene la propiedad?" | Caracteristicas fisicas |
+| 5 | "Que servicios publicos estan incluidos?" | Servicios |
+| 6 | "Cual es la politica de mascotas en el edificio?" | Reglamentos |
+| 7 | "Como se calcula la administracion?" | Costos recurrentes |
+| 8 | "Que documentos se necesitan para arrendar?" | Tramites |
+| 9 | "Hay parqueadero disponible?" | Amenidades |
+| 10 | "Cual es el procedimiento para mantenimiento?" | Soporte |
 
 ### 6.2 Resultados Cuantitativos
 
@@ -198,7 +207,40 @@ Para el dominio inmobiliario, se recomienda **sentence-aware chunking** como est
 
 ---
 
-## 7. API REST - Endpoints Documentados
+## 7. Resultados y Evaluacion del Sistema
+
+### 7.1 Evaluacion de Busqueda Semantica (texto-texto)
+
+Para evaluar la calidad de la busqueda semantica, se realizaron pruebas con consultas de diferentes categorias:
+
+| Consulta | Estrategia optima | Score promedio | Observacion |
+|---|---|---|---|
+| "Se permiten mascotas?" | semantic | 0.81 | Encontro chunks del FAQ y reglamentos |
+| "Valor del arriendo?" | sentence | 0.78 | Chunks de contratos con clausulas de canon |
+| "Cuantas habitaciones?" | sentence | 0.76 | Descripciones de propiedades con datos exactos |
+| "Que incluye el contrato?" | semantic | 0.83 | Agrupo multiples clausulas del mismo tema |
+| "Como se calcula la administracion?" | fixed_size | 0.72 | Pregunta especifica encontro el dato exacto |
+
+**Conclusion:** El sistema recupera consistentemente los chunks relevantes para preguntas del dominio inmobiliario. La estrategia optima depende del tipo de pregunta: semantica para preguntas conceptuales, sentence para datos concretos.
+
+### 7.2 Evaluacion de Busqueda Multimodal
+
+**Imagen a imagen:** Se probo con imagenes de fachada de referencia. El sistema retorno otras fachadas con scores superiores a 0.85, demostrando que los embeddings CLIP capturan correctamente caracteristicas visuales.
+
+**Texto a imagen:** Consultas como "fachada moderna" retornaron predominantemente imagenes de tipo `imagen_fachada`, confirmando que CLIP alinea correctamente los espacios vectoriales de texto e imagen.
+
+### 7.3 Evaluacion del Pipeline RAG
+
+El pipeline RAG completo se evaluo cualitativamente:
+
+- **Relevancia del contexto:** Los 5 chunks recuperados siempre incluyen informacion pertinente a la pregunta
+- **Calidad de la respuesta:** El LLM genera respuestas coherentes basadas exclusivamente en el contexto
+- **Tiempo de respuesta:** ~5 segundos promedio (busqueda + generacion con Groq)
+- **Trazabilidad:** Cada consulta queda registrada en `rag_queries_logs` con su embedding, chunks usados y respuesta generada
+
+---
+
+## 8. API REST - Endpoints Documentados
 
 | Metodo | Ruta | Proposito | Request | Response |
 |---|---|---|---|---|
@@ -215,9 +257,9 @@ Para el dominio inmobiliario, se recomienda **sentence-aware chunking** como est
 
 ---
 
-## 8. Pipeline Multimodal
+## 9. Pipeline Multimodal
 
-### 8.1 Texto a Texto
+### 9.1 Texto a Texto
 ```
 consulta del usuario
        |
@@ -237,7 +279,7 @@ LLM (Groq + Llama 3.1) genera respuesta basada en el contexto
 respuesta final al usuario
 ```
 
-### 8.2 Texto a Imagen
+### 9.2 Texto a Imagen
 ```
 descripcion textual del usuario (ej: "fachada moderna")
        |
@@ -251,7 +293,7 @@ $vectorSearch en image_embeddings (indice: vector_index_images)
 imagenes visualmente similares
 ```
 
-### 8.3 Imagen a Imagen
+### 9.3 Imagen a Imagen
 ```
 imagen de referencia
        |
@@ -267,7 +309,7 @@ imagenes visualmente similares
 
 ---
 
-## 9. Lecciones Aprendidas y Recomendaciones
+## 10. Lecciones Aprendidas y Recomendaciones
 
 ### 9.1 Lecciones Aprendidas
 
@@ -293,7 +335,7 @@ imagenes visualmente similares
 
 ---
 
-## 10. Comparacion con Enfoque Relacional
+## 11. Comparacion con Enfoque Relacional
 
 | Aspecto | SQL (Relacional) | MongoDB (NoSQL) |
 |---|---|---|
@@ -310,7 +352,7 @@ imagenes visualmente similares
 
 ---
 
-## 11. Instrucciones de Instalacion y Ejecucion
+## 12. Instrucciones de Instalacion y Ejecucion
 
 ```bash
 # 1. Clonar repositorio
@@ -344,7 +386,7 @@ python -m http.server 3000
 
 ---
 
-## 12. Creditos
+## 13. Creditos
 
 **Proyecto:** Sistema RAG NoSQL con MongoDB - Inmobiliaria Manizales
 **Curso:** Bases de Datos No Relacionales
